@@ -1,95 +1,105 @@
 # Architecture Contract
 
-This document defines constraints that should be treated like API compatibility rules.
+These rules are treated as executable compatibility constraints.
 
 ## AC-1: Core is execution-detail blind
 
-Files directly under `src/regorch/` may orchestrate lifecycle, evidence, selection, and scheduling. They must not import concrete implementations from:
-
-```text
-regorch.adapters.*
-regorch.sources.*
-regorch.capacity.*
-```
-
-They also must not spawn project commands directly.
-
-Enforced by:
-
-```text
-tests/test_core_boundaries.py
-tests/test_core_isolation.py
-```
+Core may orchestrate lifecycle, selection, evidence, directory allocation, and
+scheduling. It must not import concrete adapter/source/capacity implementations
+or execute project commands directly.
 
 ## AC-2: Project execution crosses only ExecutionAdapter
 
-Core sees jobs and observations as opaque data. Only an `ExecutionAdapter` may interpret a command, simulator output, board response, or project-specific PASS/FAIL rule.
-
-Required methods:
-
 ```text
+probe(context)
 setup(context)
 plan(context)
-execute(context, job)
+execute(context, job, execution_context)
 collect(context, executions)
 ```
 
-## AC-3: SCM semantics cross only SourceProvider
+Only adapters interpret project commands, simulator output, board responses, or
+verification result rules.
 
-Core may request materialization but may not know checkout/update command details. Git and SVN are bundled implementations, not core concepts.
+## AC-3: Job identity defines rerun granularity
 
-Required method:
+A Job is an independently schedulable and independently rerunnable unit.
+
+Required:
+
+- unique within a plan;
+- non-empty stable string identity;
+- no leading/trailing whitespace;
+- no control characters;
+- JSON-serializable payload and metadata.
+
+`--failed-from` selects failed **Job IDs**. Core does not split a Job into finer
+project-defined tests.
+
+## AC-4: Core allocates per-job ExecutionContext
+
+Core creates isolated `work`, `artifacts`, and `logs` directories for every
+selected Job and passes them to `execute`. Directory names are derived safely and
+must not directly trust Job IDs as paths.
+
+## AC-5: Large process output is file evidence
+
+Adapter implementations must not place unbounded stdout/stderr bodies into
+canonical JSON. File references and small metadata are the expected evidence.
+
+The bundled process utility streams stdout/stderr directly to files and has no
+`shell=True` API.
+
+## AC-6: Process timeout is group-scoped
+
+For subprocess-based adapters, the recommended utility starts a new process
+session. Timeout termination targets the process group with SIGTERM followed by
+SIGKILL after a grace period.
+
+## AC-7: SCM semantics cross only SourceProvider
+
+Core requests materialization but does not know Git/SVN commands. Built-in Git
+and SVN are plugins, not core concepts.
+
+## AC-8: Load semantics cross only CapacityProvider
+
+Core knows only `available_slots()` and `max_parallel`. Queue/farm semantics
+remain outside core.
+
+## AC-9: Intent and machine evidence are separate
 
 ```text
-materialize(source, destination)
-```
-
-## AC-4: Load semantics cross only CapacityProvider
-
-Core does not know queue names, farm commands, host-load formulas, or scheduler brands.
-
-Required method:
-
-```text
-available_slots() -> int
-```
-
-## AC-5: Human intent and machine evidence are separate
-
-```text
-regression.yaml   human-authored intent
+regression.yaml   human intent
 context.json      resolved/frozen context
 plan.json         discovered canonical plan
 run.json          selected/executed run evidence
 result.json       canonical result evidence
 ```
 
-Generated JSON must not be used as a hand-edited configuration format.
+## AC-10: FAIL rerun has explicit provenance
 
-## AC-6: FAIL rerun has explicit provenance
+A FAIL-only rerun names the previous run/result explicitly. The new run records
+the source result path, run ID, SHA-256, and selected Job IDs.
 
-A FAIL-only rerun must name the previous result/run directory. No implicit `latest failed` behavior is part of the architecture.
+## AC-11: Integration must not require core modification
 
-The new run records the selected source evidence, including the previous result identity/hash.
+External `module:Class` plugins are supported for execution/source/capacity.
+Project integration belongs in a project-owned package.
 
-## AC-7: External integration must not require core modification
+## AC-12: Connection checks are first-class
 
-The loader accepts `module:Class` plugins. A project may therefore own its adapter/provider package separately and install it into the same Python environment.
+Every extension contract offers `probe`. `reg doctor` orchestrates these probes
+without materializing sources or running regression Jobs. Missing custom probe
+logic may produce WARN; concrete connection failure produces FAIL.
 
-Example:
+## AC-13: Conformance is reusable
 
-```yaml
-execution:
-  adapter: company_soc.regression:Adapter
-```
-
-Enforced by `tests/test_architecture_contracts.py`.
+`regorch.testing` provides execution/source/capacity conformance helpers that can
+be used from project-owned pytest suites. Contract changes require corresponding
+conformance and documentation updates.
 
 ## Change rule
 
-If a proposed change violates an AC rule, either:
-
-1. redesign the change to preserve the contract; or
-2. write an ADR explicitly replacing the rule and update the contract tests in the same change.
-
-Do not silently weaken a contract test to make a feature pass.
+If a feature violates one of these rules, either redesign it or add an ADR that
+explicitly replaces the rule and update architecture tests in the same commit.
+Do not weaken a contract test merely to make a feature pass.

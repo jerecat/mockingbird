@@ -14,6 +14,7 @@ CORE_FILES = [
     "scheduler.py",
     "selection.py",
     "cli.py",
+    "doctor.py",
 ]
 
 

@@ -1,19 +1,16 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .context import (
-    load_context,
-    load_state,
-    metadata_path,
-    update_state,
-)
+from .context import load_context, load_state, metadata_path, update_state
 from .io import read_json, write_json
-from .models import Job, JobExecution, TestResult
+from .models import ExecutionContext, Job, JobExecution, TestResult
 from .plugins import load_adapter, load_capacity_provider
 from .scheduler import run_jobs
 from .selection import Selection, select_jobs
@@ -42,6 +39,53 @@ def _components(defn: dict[str, Any]):
     return context, adapter, capacity
 
 
+def _validate_job_id(job_id: str) -> None:
+    if not isinstance(job_id, str) or not job_id:
+        raise ValueError("job ID must be a non-empty string")
+    if job_id != job_id.strip():
+        raise ValueError(f"job ID must not have leading/trailing whitespace: {job_id!r}")
+    if len(job_id) > 512:
+        raise ValueError(f"job ID is too long (>512 characters): {job_id[:80]!r}...")
+    if any(ord(ch) < 32 or ord(ch) == 127 for ch in job_id):
+        raise ValueError(f"job ID must not contain control characters: {job_id!r}")
+
+
+def _validate_jobs(jobs: list[Job]) -> None:
+    ids: list[str] = []
+    for job in jobs:
+        _validate_job_id(job.id)
+        json.dumps(job.to_dict())
+        ids.append(job.id)
+    if len(ids) != len(set(ids)):
+        raise ValueError("adapter returned duplicate job IDs")
+
+
+def _job_directory_name(index: int, job_id: str) -> str:
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "_", job_id).strip("._-") or "job"
+    slug = slug[:64]
+    digest = hashlib.sha256(job_id.encode()).hexdigest()[:10]
+    return f"{index:04d}_{slug}_{digest}"
+
+
+def _execution_context(run_id: str, run_dir: Path, index: int, job: Job) -> ExecutionContext:
+    job_dir = run_dir / "jobs" / _job_directory_name(index, job.id)
+    workdir = job_dir / "work"
+    artifact_dir = job_dir / "artifacts"
+    logs_dir = job_dir / "logs"
+    for path in (job_dir, workdir, artifact_dir, logs_dir):
+        path.mkdir(parents=True, exist_ok=True)
+    return ExecutionContext(
+        run_id=run_id,
+        run_dir=str(run_dir.resolve()),
+        job_dir=str(job_dir.resolve()),
+        workdir=str(workdir.resolve()),
+        artifact_dir=str(artifact_dir.resolve()),
+        logs_dir=str(logs_dir.resolve()),
+        stdout_path=str((logs_dir / "stdout.log").resolve()),
+        stderr_path=str((logs_dir / "stderr.log").resolve()),
+    )
+
+
 def setup(defn: dict[str, Any]) -> None:
     context, adapter, _ = _components(defn)
     adapter.setup(context)
@@ -56,14 +100,7 @@ def create_plan(defn: dict[str, Any]) -> dict[str, Any]:
 
     adapter = load_adapter(str(context["execution"]["adapter"]))
     jobs = adapter.plan(context)
-    ids = [job.id for job in jobs]
-    if len(ids) != len(set(ids)):
-        raise ValueError("adapter returned duplicate job IDs")
-
-    # The plan is persisted as evidence. Opaque payloads therefore still need
-    # to be JSON-serializable, but core never interprets their contents.
-    for job in jobs:
-        json.dumps(job.to_dict())
+    _validate_jobs(jobs)
 
     plan = {
         "schema_version": 1,
@@ -117,6 +154,11 @@ def run(
     run_dir = run_root / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
 
+    execution_contexts = {
+        job.id: _execution_context(run_id, run_dir, index, job)
+        for index, job in enumerate(selected, start=1)
+    }
+
     write_json(run_dir / "context.json", context)
     write_json(run_dir / "plan.json", plan)
     run_record = {
@@ -133,15 +175,31 @@ def run(
             "max_parallel": context["scheduler"]["max_parallel"],
             "poll_interval_s": context["scheduler"]["poll_interval_s"],
         },
+        "jobs": {
+            job.id: execution_contexts[job.id].evidence_paths()
+            for job in selected
+        },
     }
     write_json(run_dir / "run.json", run_record)
 
     scheduler = context["scheduler"]
     started = time.monotonic()
+
+    def execute(job: Job) -> JobExecution:
+        execution_context = execution_contexts[job.id]
+        result = adapter.execute(context, job, execution_context)
+        if result.job_id != job.id:
+            raise ValueError(
+                f"adapter returned execution for {result.job_id!r}; expected {job.id!r}"
+            )
+        result.paths = execution_context.evidence_paths()
+        json.dumps(result.to_dict())
+        return result
+
     try:
         executions = run_jobs(
             selected,
-            lambda job: adapter.execute(context, job),
+            execute,
             capacity,
             int(scheduler["max_parallel"]),
             float(scheduler["poll_interval_s"]),
@@ -202,6 +260,7 @@ def _validate_results(
             raise ValueError(
                 f"adapter returned invalid status {test.status!r} for test {test.id!r}"
             )
+        json.dumps(test.to_dict())
     return tests
 
 

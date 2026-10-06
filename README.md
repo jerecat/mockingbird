@@ -2,133 +2,84 @@
 
 A deliberately small, adapter-driven regression orchestrator prototype.
 
-Current prototype version: **0.3.0**.
+Current prototype version: **0.4.0**.
 
-The core knows **when** to prepare, setup, plan, select, schedule, run, and collect. It does **not** know how a simulator starts, how a board is controlled, what a test command means, which source-control system is used, or how a compute farm reports load.
-
-The main evidence chain is:
+Core owns **when** to prepare, setup, plan, select, schedule, run, and collect.
+It does not know how VCS/QEMU/a board/formal tool starts, what a testcase command
+means, how project PASS/FAIL is parsed, whether sources are Git/SVN, or how a
+compute farm measures load.
 
 ```text
-regression.yaml                 human-authored intent
-       |
-       v
-   prepare  -- SourceProvider(s) --> work/sources/*
-       |
-       v
- context.json                   frozen verification context
-       |
-     setup                      project-specific adapter boundary
-       |
-       v
-      plan  <------------------- adapter discovers opaque Jobs
-       |
-       v
-   plan.json
-       |
-     select                     core operates on Job IDs only
-       |
-       v
-      run   -- CapacityProvider --> generic scheduler
-       |
-       v
-    run.json + executions.json
-       |
-    collect <------------------- adapter interprets observations
-       |
-       v
-   result.json                   canonical result evidence
+regression.yaml
+      |
+    doctor             non-destructive connection check
+      |
+   prepare  --> context.json
+      |
+    setup
+      |
+     plan   --> plan.json
+      |
+ select / dry-run
+      |
+     run    --> run.json + executions.json + per-job work/log/artifact dirs
+      |
+   collect  --> result.json
 ```
 
-In short:
+The evidence model remains:
 
 ```text
 Context -> Plan -> Run -> Result
 ```
 
-`dry-run` is a read-only view of the frozen context + selected plan before `run`.
+## Key architecture rules
 
-## Design rules
+1. Core never interprets project commands.
+2. Core never knows Git/SVN command semantics.
+3. Core never knows farm/queue semantics.
+4. A `Job` is the project-chosen independently schedulable/rerunnable unit.
+5. FAIL rerun granularity is Job granularity.
+6. Core creates an isolated `ExecutionContext` per selected Job.
+7. Large stdout/stderr belongs in files, not Python memory or canonical JSON.
+8. Project integration should not require editing/forking core.
+9. `reg doctor` and project-side conformance tests are first-class integration gates.
+10. Architecture rules are executable tests and documented ADRs.
 
-1. **Core never interprets project commands.** Job payloads are opaque JSON-serializable values.
-2. **Core never knows Git/SVN semantics.** Source materialization is behind `SourceProvider`.
-3. **Core never knows farm/queue semantics.** Capacity is behind `CapacityProvider`.
-4. **Human intent and machine evidence are separate.** YAML is input; JSON is frozen evidence.
-5. **FAIL rerun is explicit.** There is no implicit "previous run" selector.
-6. **Every run snapshots its context and plan.** A result can be traced back to exactly what was selected and executed.
-7. **Project integration does not require a core fork.** External plugins can be installed separately and referenced as `module:Class`.
-8. **Architecture rules are executable contracts.** Boundary tests fail if concrete execution/SCM/load semantics leak into core.
-
-## Repository layout
-
-```text
-src/regorch/
-  cli.py
-  context.py              workspace + frozen context
-  lifecycle.py            prepare/setup/plan/run/collect lifecycle
-  selection.py            ID-only selection logic
-  scheduler.py            generic parallel scheduler
-  contracts.py            extension contracts
-  models.py               canonical Job/Execution/Result models
-  sources/
-    git.py                 Git SourceProvider
-    svn.py                 SVN SourceProvider
-  capacity/
-    fixed.py               fixed concurrency provider
-    command.py             command-backed concurrency provider
-  adapters/
-    demo_linux.py          demo only: ls/mkdir/rm/sh commands
-
-tests/                     unit + architecture-contract + end-to-end tests
-Documentation/             architecture, integration guides, and ADRs
-examples/                  Linux sanity, self-host, external-plugin demos
-```
-
-The demo Linux commands exist only under the demo adapter/config. The core does not know their meaning.
-
-## Development setup
+## Quick start
 
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -e '.[dev]'
 pytest
+reg doctor examples/sanity-linux.yaml
+reg all examples/sanity-linux.yaml
 ```
 
-For environments that prefer requirements files:
+Or:
 
 ```bash
-pip install -r requirements-dev.txt
-pip install -e .
-pytest
+make architecture
+make doctor
+make sanity
+make self-demo
 ```
 
-Fast checks after installation:
+## Workspace/run layout
 
-```bash
-make architecture   # architecture contract tests
-make sanity         # ordinary Linux commands, no project integration
-make self-demo      # regorch orchestrates selected tests of regorch itself
-```
-
-## Workspace convention
-
-Relative `workspace` and `run_root` paths are resolved from the directory where `reg` is invoked.
-
-With the default paths:
+Relative paths are based on the directory where `reg` is invoked.
 
 ```text
 $PWD/
   regression.yaml
   work/
     sources/
-      <source-name>/          materialized source trees
-    exec/                     adapter-owned execution work area
+    exec/
     .reg/
       context.json
       plan.json
       state.json
-      last_run.json
-      last_result.json
   runs/
     <run-id>/
       context.json
@@ -136,15 +87,22 @@ $PWD/
       run.json
       executions.json
       result.json
+      jobs/
+        <safe-job-directory>/
+          work/
+          artifacts/
+          logs/
+            stdout.log
+            stderr.log
 ```
 
-`work/sources/*` is tool-owned. Git materialization cleans stale files so the tree matches the resolved commit.
+Job IDs are never trusted directly as filesystem paths; core allocates a safe,
+deterministic directory name per selected Job.
 
 ## Lifecycle
 
-Run each stage explicitly:
-
 ```bash
+reg doctor regression.yaml
 reg prepare regression.yaml
 reg setup regression.yaml
 reg plan regression.yaml
@@ -154,272 +112,131 @@ reg collect regression.yaml
 reg status regression.yaml
 ```
 
-Or use the convenience chain:
+Or:
 
 ```bash
 reg all regression.yaml --interactive
 ```
 
-`--interactive` is a **single pre-run checklist**, not a question per testcase. It shows the frozen context, resolved source revisions, selected job count/IDs, and scheduler settings, then asks once before execution.
+`doctor` does not materialize sources or run Jobs. It validates configuration,
+plugin loading, and configured connection probes.
 
-`collect` and `all` return a non-zero process exit code when the canonical regression result is not PASS, which makes them usable from CI.
+## Job model
 
-## Verification context / source materialization
-
-A regression may contain zero, one, or any number of mixed sources:
-
-```yaml
-sources:
-  - name: dut
-    provider: git
-    url: ssh://server/dut.git
-    revision: main
-
-  - name: testbench
-    provider: svn
-    url: https://server/svn/tb/trunk
-    revision: "18291"
-
-  - name: firmware
-    provider: git
-    url: ssh://server/fw.git
-    revision: release/r1
-```
-
-At `prepare`, symbolic revisions are resolved and frozen into `work/.reg/context.json`:
+A Job is **not necessarily one testcase**. Examples:
 
 ```text
-requested revision      frozen evidence
-------------------      ---------------
-main                 -> Git commit SHA
-release/r1           -> Git commit SHA
-HEAD / SVN revision  -> concrete SVN revision
+1 C testcase
+1 UVM test + seed
+100-test batch
+formal property group
+board boot + scenario
+compile/elaboration unit
 ```
 
-Provider-specific non-secret options may be placed under a source `config` mapping and are preserved in the context. Credentials/tool installation remain external environment concerns and should not be written into the context.
+Choose the boundary such that rerunning the same Job ID is meaningful. If one Job
+contains 100 tests, `--failed-from` reruns that whole Job.
 
-The intent is that `context.json` contains the orchestrator-controlled information needed to reconstruct the verification context later.
+Job IDs should be stable and human-readable. Do not embed timestamp/PID/run path.
 
-## Planning and test selection
-
-The adapter discovers jobs. Core sees only canonical IDs plus an opaque payload:
-
-```text
-Adapter -> Job(id, opaque_payload) -> Plan -> Selection -> Scheduler -> Adapter
-```
-
-### All tests
+## Selection
 
 ```bash
-reg run regression.yaml
-```
-
-### Exact IDs
-
-```bash
-reg run regression.yaml \
-  --test mkdir_demo \
-  --test list_demo
-```
-
-### ID glob
-
-```bash
-reg run regression.yaml --match '*demo'
-```
-
-### Editable selection file
-
-Generate a plain text selection from the canonical plan:
-
-```bash
+reg run regression.yaml --test pcie/dma/write/seed-001
+reg run regression.yaml --match 'pcie/*'
 reg plan regression.yaml --write-selection run.txt
 vim run.txt
 reg run regression.yaml --selection run.txt
+reg run regression.yaml --failed-from runs/<explicit-run>/result.json
 ```
 
-The file contains only opaque job IDs, one per line. Blank lines and `#` comments are ignored. Editing the selection never requires core to understand testcase commands.
+There is intentionally no implicit "latest failed" source.
 
-### Rerun FAIL from a specific prior result
+## Adapter process execution
 
-There is intentionally no implicit "last failed" behavior. Point at the exact evidence to use:
+For normal Linux subprocess adapters, use:
 
-```bash
-reg run regression.yaml \
-  --failed-from runs/20261007_010203_000000_my-regression/result.json
+```python
+from regorch.adapter_utils import run_process
+
+process = run_process(
+    ["./run_test.sh", "--test", job.id],
+    execution,
+    timeout_s=3600,
+    env=my_environment,
+)
 ```
 
-A run directory may also be supplied:
-
-```bash
-reg run regression.yaml \
-  --failed-from runs/20261007_010203_000000_my-regression
-```
-
-Only tests whose prior canonical status is exactly `FAIL` are selected. The new `run.json` records:
+The utility uses:
 
 ```text
-failed_from path
-failed_from run_id
-failed_from SHA-256
-selected IDs
+shell=False
+stdin=DEVNULL
+stdout/stderr streamed directly to files
+new process session
+timeout -> SIGTERM -> grace -> SIGKILL for the process group
 ```
 
-Selectors may be combined. `--failed-from` first establishes the FAIL subset; `--test`, `--match`, or `--selection` then narrows it.
+Avoid `capture_output=True` for real regression payloads. Simulator logs can be
+large; `JobExecution`/`result.json` should contain paths and small metadata only.
 
-## Load / capacity boundary
+If shell behavior is required, place it in a project-owned wrapper script rather
+than embedding shell strings in generic Python.
 
-The scheduler uses two independent limits:
+## Connection and conformance
 
-1. `max_parallel`: hard ceiling owned by this orchestrator.
-2. `CapacityProvider.available_slots()`: polled external concurrency allowance for this orchestrator **right now**.
+Runtime/machine health:
 
-The effective concurrency limit is:
-
-```text
-min(max_parallel, available_slots())
+```bash
+reg doctor regression.yaml
 ```
 
-If the external value drops below the number already running, current jobs are not killed; the scheduler simply submits no new work until capacity allows it.
+Implementation contract in project pytest:
 
-Polling interval is configurable:
+```python
+from regorch.testing import assert_conformance, check_execution_adapter
 
-```yaml
-scheduler:
-  capacity_provider: command
-  max_parallel: 8
-  poll_interval_s: 5.0
-  config:
-    command: ["my-farm-capacity", "--queue", "verification"]
-    timeout_s: 10
+checks = check_execution_adapter(MyAdapter(), project_context, tmp_path)
+assert_conformance(checks)
 ```
 
-The command contract is deliberately tiny: print one non-negative integer to stdout. The wrapper command may inspect LSF, Slurm, a proprietary farm, host load, or anything else; core does not care.
-
-A fixed provider is also included for local tests:
-
-```yaml
-scheduler:
-  capacity_provider: fixed
-  max_parallel: 2
-  poll_interval_s: 0.2
-  config:
-    slots: 2
-```
-
-## Canonical result
-
-Adapters translate project-specific observations into a stable result model:
-
-```json
-{
-  "schema_version": 1,
-  "run_id": "...",
-  "name": "my-regression",
-  "started_at": "...",
-  "finished_at": "...",
-  "duration_s": 123.4,
-  "status": "FAIL",
-  "summary": {
-    "total": 3,
-    "pass": 2,
-    "fail": 1,
-    "error": 0,
-    "skip": 0
-  },
-  "tests": [
-    {
-      "id": "failing_test",
-      "status": "FAIL",
-      "duration_s": 0.01,
-      "reason": "exit=7",
-      "metadata": {}
-    }
-  ]
-}
-```
-
-Canonical testcase statuses are `PASS`, `FAIL`, `ERROR`, and `SKIP`. Core validates that the adapter returns exactly one result for every executed job.
-
-A future history/UI layer should consume `result.json`; it should never parse simulator, board, or project-specific logs directly.
+Equivalent helpers exist for SourceProvider and CapacityProvider.
 
 ## Extension contracts
 
-### ExecutionAdapter
-
 ```python
-setup(context)
-plan(context) -> list[Job]
-execute(context, job) -> JobExecution
-collect(context, executions) -> list[TestResult]
+ExecutionAdapter:
+  probe(context)
+  setup(context)
+  plan(context) -> list[Job]
+  execute(context, job, execution_context) -> JobExecution
+  collect(context, executions) -> list[TestResult]
+
+SourceProvider:
+  probe(source)
+  materialize(source, destination) -> resolved_evidence
+
+CapacityProvider:
+  probe()
+  available_slots() -> int
 ```
 
-### SourceProvider
-
-```python
-materialize(source, destination) -> resolved_evidence
-```
-
-### CapacityProvider
-
-```python
-available_slots() -> int
-```
-
-These three boundaries are the architecture. Keep project-, source-control-, and farm-specific knowledge outside core.
-
-Built-in plugins may use short names. Project-owned plugins may live in another installed Python package and use `module:Class`:
+Built-ins use short names. Project-owned plugins can be installed separately:
 
 ```yaml
 execution:
   adapter: my_soc_verification.regression:Adapter
 ```
 
-See `Documentation/Integration_Guide.md` and `examples/external_adapter/`.
-
-## Demos
-
-### Zero-integration Linux sanity
-
-```bash
-reg all examples/sanity-linux.yaml
-```
-
-This runs `pwd`, `ls`, `mkdir`, and `rm` as fake tests behind the demo adapter. Core never interprets those commands.
-
-### Self-hosted demo
-
-```bash
-reg all examples/self-host.yaml
-```
-
-Here regorch schedules selected groups of its own pytest suite through the concrete `selftest` adapter. This proves the orchestrator can orchestrate itself without adding pytest semantics to core.
-
-### External project adapter
-
-```bash
-pip install -e examples/external_adapter
-reg all examples/external-adapter.yaml
-```
-
-The example adapter is outside the `regorch` package and is loaded through `module:Class`, demonstrating the intended project integration model.
-
-### Explicit FAIL rerun
-
-```bash
-reg all examples/regression-fail-demo.yaml || true
-reg run examples/regression-fail-demo.yaml --failed-from <chosen-run-dir>
-```
-
-Use the actual generated run directory rather than an implicit "latest" selector.
-
 ## Documentation
 
-Start with:
+Start here:
 
-- `Documentation/Getting_Started.md`
 - `Documentation/Architecture.md`
 - `Documentation/Architecture_Contract.md`
+- `Documentation/Adapter_Implementation_Guide.md`
+- `Documentation/Adapter_Conformance_Testing.md`
+- `Documentation/Getting_Started.md`
 - `Documentation/Integration_Guide.md`
 - `Documentation/Demos.md`
 - `Documentation/ADR/`

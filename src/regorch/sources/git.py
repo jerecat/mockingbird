@@ -1,16 +1,20 @@
 from __future__ import annotations
 
+import os
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
 
 from regorch.contracts import SourceProvider
+from regorch.models import CheckResult
 
 
-def _run(args: list[str], *, cwd: Path | None = None) -> str:
+def _run(args: list[str], *, cwd: Path | None = None, env=None) -> str:
     completed = subprocess.run(
         args,
         cwd=cwd,
+        env=env,
         check=True,
         text=True,
         capture_output=True,
@@ -26,9 +30,6 @@ def _try_run(args: list[str], *, cwd: Path) -> str | None:
 
 
 def _resolve_revision(destination: Path, revision: str) -> str:
-    # A human-authored branch name should follow the freshly fetched remote,
-    # not a stale local branch left in a reused checkout. Explicit SHAs/tags/
-    # refs still fall back to normal Git revision resolution.
     candidates: list[str] = []
     if revision == "HEAD":
         candidates.append("refs/remotes/origin/HEAD^{commit}")
@@ -44,6 +45,25 @@ def _resolve_revision(destination: Path, revision: str) -> str:
 
 
 class Provider(SourceProvider):
+    def probe(self, source: dict[str, Any]):
+        component = f"source:{source.get('name', '?')}"
+        if shutil.which("git") is None:
+            return [CheckResult(component, "git", "FAIL", "git executable not found")]
+        env = os.environ.copy()
+        env["GIT_TERMINAL_PROMPT"] = "0"
+        try:
+            version = _run(["git", "--version"], env=env)
+            _run(["git", "ls-remote", str(source["url"])], env=env)
+        except Exception as exc:
+            return [
+                CheckResult(component, "git", "PASS", version if 'version' in locals() else "git found"),
+                CheckResult(component, "repository", "FAIL", f"{type(exc).__name__}: {exc}"),
+            ]
+        return [
+            CheckResult(component, "git", "PASS", version),
+            CheckResult(component, "repository", "PASS", "repository reachable without interactive prompt"),
+        ]
+
     def materialize(self, source: dict[str, Any], destination: Path) -> dict[str, Any]:
         url = str(source["url"])
         revision = str(source.get("revision", "HEAD"))
@@ -59,8 +79,6 @@ class Provider(SourceProvider):
         _run(["git", "fetch", "--all", "--tags", "--prune"], cwd=destination)
         resolved = _resolve_revision(destination, revision)
         _run(["git", "checkout", "--detach", "--force", resolved], cwd=destination)
-        # The source tree is tool-owned. Remove stale tracked/untracked state so
-        # the materialized tree corresponds to the resolved revision.
         _run(["git", "reset", "--hard", resolved], cwd=destination)
         _run(["git", "clean", "-ffdx"], cwd=destination)
 

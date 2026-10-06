@@ -4,11 +4,21 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
-from .models import Job, JobExecution, TestResult
+from .models import CheckResult, ExecutionContext, Job, JobExecution, TestResult
 
 
 class ExecutionAdapter(ABC):
     """Project-specific execution boundary."""
+
+    def probe(self, context: dict[str, Any]) -> list[CheckResult]:
+        return [
+            CheckResult(
+                component="execution",
+                name="probe",
+                status="WARN",
+                message="adapter does not implement a project-specific connection probe",
+            )
+        ]
 
     @abstractmethod
     def setup(self, context: dict[str, Any]) -> None: ...
@@ -17,7 +27,12 @@ class ExecutionAdapter(ABC):
     def plan(self, context: dict[str, Any]) -> list[Job]: ...
 
     @abstractmethod
-    def execute(self, context: dict[str, Any], job: Job) -> JobExecution: ...
+    def execute(
+        self,
+        context: dict[str, Any],
+        job: Job,
+        execution: ExecutionContext,
+    ) -> JobExecution: ...
 
     @abstractmethod
     def collect(
@@ -28,12 +43,44 @@ class ExecutionAdapter(ABC):
 class CapacityProvider(ABC):
     """Reports the total concurrent-job allowance at this moment."""
 
+    def probe(self) -> list[CheckResult]:
+        try:
+            slots = self.available_slots()
+        except Exception as exc:
+            return [
+                CheckResult(
+                    component="capacity",
+                    name="available_slots",
+                    status="FAIL",
+                    message=f"{type(exc).__name__}: {exc}",
+                )
+            ]
+        return [
+            CheckResult(
+                component="capacity",
+                name="available_slots",
+                status="PASS",
+                message=f"available_slots={slots}",
+                details={"available_slots": slots},
+            )
+        ]
+
     @abstractmethod
     def available_slots(self) -> int: ...
 
 
 class SourceProvider(ABC):
     """Materializes one source without exposing source-control semantics to core."""
+
+    def probe(self, source: dict[str, Any]) -> list[CheckResult]:
+        return [
+            CheckResult(
+                component=f"source:{source.get('name', '?')}",
+                name="probe",
+                status="WARN",
+                message="source provider does not implement a connection probe",
+            )
+        ]
 
     @abstractmethod
     def materialize(

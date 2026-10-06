@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import subprocess
+import importlib.util
 import sys
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from regorch.adapter_utils import run_process
 from regorch.contracts import ExecutionAdapter
-from regorch.models import Job, JobExecution, TestResult
+from regorch.models import CheckResult, ExecutionContext, Job, JobExecution, TestResult
 
 
 def _now() -> str:
@@ -15,12 +15,18 @@ def _now() -> str:
 
 
 class Adapter(ExecutionAdapter):
-    """Demo adapter that connects regorch to its own pytest suite.
+    """Demo adapter that connects regorch to its own pytest suite."""
 
-    This is intentionally concrete and lives outside core. It demonstrates
-    that the orchestrator can schedule and collect its own repository tests
-    using exactly the same extension boundary as a real verification project.
-    """
+    def probe(self, context):
+        available = importlib.util.find_spec("pytest") is not None
+        return [
+            CheckResult(
+                component="execution",
+                name="pytest",
+                status="PASS" if available else "FAIL",
+                message="pytest importable" if available else "pytest is not installed",
+            )
+        ]
 
     def setup(self, context):
         Path(context["paths"]["adapter_workdir"]).mkdir(parents=True, exist_ok=True)
@@ -36,52 +42,52 @@ class Adapter(ExecutionAdapter):
             for item in suites
         ]
 
-    def execute(self, context, job):
+    def execute(self, context, job, execution: ExecutionContext):
         started_at = _now()
-        started = time.monotonic()
-        command = [
-            sys.executable,
-            "-m",
-            "pytest",
-            "-q",
-            "-p",
-            "no:cacheprovider",
-            *list(job.payload["targets"]),
-        ]
-        completed = subprocess.run(
-            command,
+        process = run_process(
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "-q",
+                "-p",
+                "no:cacheprovider",
+                *list(job.payload["targets"]),
+            ],
+            execution,
             cwd=context["invocation_dir"],
-            text=True,
-            capture_output=True,
+            timeout_s=float(job.payload.get("timeout_s", 120.0)),
         )
         return JobExecution(
             job_id=job.id,
             started_at=started_at,
             finished_at=_now(),
-            duration_s=time.monotonic() - started,
-            observation={
-                "returncode": completed.returncode,
-                "stdout": completed.stdout,
-                "stderr": completed.stderr,
-            },
+            duration_s=process.duration_s,
+            observation=process.to_observation(),
         )
 
     def collect(self, context, executions):
         results = []
         for execution in executions:
-            returncode = int(execution.observation["returncode"])
-            reason = None
-            if returncode != 0:
-                stderr = str(execution.observation.get("stderr", "")).strip()
-                stdout = str(execution.observation.get("stdout", "")).strip()
-                tail = (stderr or stdout)[-500:]
-                reason = f"pytest exit={returncode}" + (f": {tail}" if tail else "")
+            observation = execution.observation
+            returncode = int(observation["returncode"])
+            timed_out = bool(observation.get("timed_out", False))
+            if timed_out:
+                status = "ERROR"
+                reason = "pytest timeout"
+            else:
+                status = "PASS" if returncode == 0 else "FAIL"
+                reason = None if returncode == 0 else f"pytest exit={returncode}"
             results.append(
                 TestResult(
                     id=execution.job_id,
-                    status="PASS" if returncode == 0 else "FAIL",
+                    status=status,
                     duration_s=execution.duration_s,
                     reason=reason,
+                    metadata={
+                        "stdout": execution.paths.get("stdout"),
+                        "stderr": execution.paths.get("stderr"),
+                    },
                 )
             )
         return results

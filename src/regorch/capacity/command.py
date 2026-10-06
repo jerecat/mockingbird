@@ -4,6 +4,7 @@ import subprocess
 from typing import Any
 
 from regorch.contracts import CapacityProvider
+from regorch.models import CheckResult
 
 
 class Provider(CapacityProvider):
@@ -17,6 +18,28 @@ class Provider(CapacityProvider):
             raise ValueError("capacity command must be a non-empty list of strings")
         self._command = command
         self._timeout_s = float(config.get("timeout_s", 10.0))
+
+    def probe(self):
+        try:
+            slots = self.available_slots()
+        except Exception as exc:
+            return [
+                CheckResult(
+                    component="capacity",
+                    name="command",
+                    status="FAIL",
+                    message=f"{type(exc).__name__}: {exc}",
+                )
+            ]
+        return [
+            CheckResult(
+                component="capacity",
+                name="command",
+                status="PASS",
+                message=f"capacity command returned {slots}",
+                details={"available_slots": slots},
+            )
+        ]
 
     def available_slots(self) -> int:
         completed = subprocess.run(

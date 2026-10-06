@@ -6,6 +6,7 @@ from pathlib import Path
 
 from . import lifecycle
 from .context import load_definition, metadata_path, prepare
+from .doctor import doctor_failed, run_doctor
 from .io import read_json
 from .selection import Selection, write_selection_file
 
@@ -72,7 +73,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="reg")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    for name in ("prepare", "setup", "collect", "status", "all"):
+    for name in ("doctor", "prepare", "setup", "collect", "status", "all"):
         cmd = sub.add_parser(name)
         cmd.add_argument("definition")
 
@@ -117,6 +118,14 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
     defn = load_definition(args.definition)
+
+    if args.command == "doctor":
+        checks = run_doctor(defn)
+        for item in checks:
+            print(f"{item.status:4}  {item.component:<24} {item.name:<20} {item.message}")
+        if doctor_failed(checks):
+            raise SystemExit(1)
+        return
 
     if args.command == "prepare":
         print(json.dumps(prepare(defn), indent=2))

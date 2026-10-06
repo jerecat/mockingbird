@@ -58,7 +58,56 @@ def _validate_sources(sources: list[dict[str, Any]]) -> None:
         names.add(name)
 
 
+def validate_definition(defn: dict[str, Any]) -> None:
+    sources = list(defn.get("sources", []))
+    if not all(isinstance(item, dict) for item in sources):
+        raise ValueError("sources must be a list of mappings")
+    _validate_sources(sources)
+
+    execution = defn.get("execution")
+    if not isinstance(execution, dict) or not execution.get("adapter"):
+        raise ValueError("execution.adapter is required")
+
+    scheduler = defn.get("scheduler")
+    if not isinstance(scheduler, dict) or not scheduler.get("capacity_provider"):
+        raise ValueError("scheduler.capacity_provider is required")
+    max_parallel = int(scheduler.get("max_parallel", 1))
+    poll_interval_s = float(scheduler.get("poll_interval_s", 1.0))
+    if max_parallel < 1:
+        raise ValueError("scheduler.max_parallel must be >= 1")
+    if poll_interval_s <= 0:
+        raise ValueError("scheduler.poll_interval_s must be > 0")
+
+
+def provisional_context(defn: dict[str, Any]) -> dict[str, Any]:
+    """Build a non-frozen context for connection probes only."""
+
+    validate_definition(defn)
+    workspace = workspace_path(defn)
+    run_root = run_root_path(defn)
+    scheduler = dict(defn["scheduler"])
+    scheduler["max_parallel"] = int(scheduler.get("max_parallel", 1))
+    scheduler["poll_interval_s"] = float(scheduler.get("poll_interval_s", 1.0))
+    return {
+        "schema_version": 1,
+        "name": defn.get("name", "regression"),
+        "doctor": True,
+        "definition_path": defn["_definition_path"],
+        "invocation_dir": defn["_invocation_dir"],
+        "paths": {
+            "workspace": str(workspace),
+            "sources_root": str(workspace / "sources"),
+            "adapter_workdir": str(workspace / "exec"),
+            "run_root": str(run_root),
+        },
+        "sources": [dict(item) for item in defn.get("sources", [])],
+        "execution": dict(defn["execution"]),
+        "scheduler": scheduler,
+    }
+
+
 def prepare(defn: dict[str, Any]) -> dict[str, Any]:
+    validate_definition(defn)
     workspace = workspace_path(defn)
     run_root = run_root_path(defn)
     sources_root = workspace / "sources"
@@ -69,7 +118,6 @@ def prepare(defn: dict[str, Any]) -> dict[str, Any]:
         path.mkdir(parents=True, exist_ok=True)
 
     sources = list(defn.get("sources", []))
-    _validate_sources(sources)
     resolved_sources: list[dict[str, Any]] = []
 
     for source in sources:
@@ -88,21 +136,10 @@ def prepare(defn: dict[str, Any]) -> dict[str, Any]:
             }
         )
 
-    execution = dict(defn.get("execution", {}))
-    scheduler = dict(defn.get("scheduler", {}))
-    if not execution.get("adapter"):
-        raise ValueError("execution.adapter is required")
-    if not scheduler.get("capacity_provider"):
-        raise ValueError("scheduler.capacity_provider is required")
-
-    max_parallel = int(scheduler.get("max_parallel", 1))
-    poll_interval_s = float(scheduler.get("poll_interval_s", 1.0))
-    if max_parallel < 1:
-        raise ValueError("scheduler.max_parallel must be >= 1")
-    if poll_interval_s <= 0:
-        raise ValueError("scheduler.poll_interval_s must be > 0")
-    scheduler["max_parallel"] = max_parallel
-    scheduler["poll_interval_s"] = poll_interval_s
+    execution = dict(defn["execution"])
+    scheduler = dict(defn["scheduler"])
+    scheduler["max_parallel"] = int(scheduler.get("max_parallel", 1))
+    scheduler["poll_interval_s"] = float(scheduler.get("poll_interval_s", 1.0))
 
     context = {
         "schema_version": 1,

@@ -1,10 +1,13 @@
-.PHONY: test architecture sanity self-demo external-demo clean
+.PHONY: test architecture doctor sanity self-demo external-demo clean
 
 test:
 	pytest
 
 architecture:
-	pytest -q tests/test_architecture_contracts.py tests/test_core_boundaries.py tests/test_core_isolation.py
+	pytest -q tests/test_architecture_contracts.py tests/test_core_boundaries.py tests/test_core_isolation.py tests/test_process_utility.py tests/test_conformance_kit.py
+
+doctor:
+	reg doctor examples/sanity-linux.yaml
 
 sanity:
 	reg all examples/sanity-linux.yaml

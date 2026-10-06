@@ -1,19 +1,19 @@
 # Integration Guide
 
-## What normally changes for a new verification environment?
+## What a project normally owns
 
-There are four possible integration points. Most projects need only the first two rows.
-
-| Area | Usually needed? | Where it belongs |
+| Area | Usually needed? | Owner |
 |---|---:|---|
-| regression definition | yes | project-owned `regression.yaml` |
-| execution behavior | yes | project-owned `ExecutionAdapter` package |
-| source acquisition | usually no | built-in Git/SVN, or custom `SourceProvider` |
-| load/capacity query | sometimes | built-in command provider, or custom `CapacityProvider` |
+| regression definition | yes | project `regression.yaml` |
+| execution behavior | yes | project `ExecutionAdapter` package |
+| adapter tests | yes | project pytest suite using `regorch.testing` |
+| source acquisition | usually no | built-in Git/SVN or custom SourceProvider |
+| capacity query | sometimes | command provider or custom CapacityProvider |
 
-**Do not edit lifecycle, scheduler, selection, or canonical result code just to connect a project.**
+Do not edit lifecycle, scheduler, selection, or canonical result code merely to
+connect a project.
 
-## Step 1: Describe sources and generic policy
+## 1. Define sources and scheduling policy
 
 ```yaml
 name: soc-nightly
@@ -23,11 +23,10 @@ sources:
     provider: git
     url: ssh://server/dut.git
     revision: main
-
   - name: testbench
     provider: svn
     url: https://server/svn/tb/trunk
-    revision: "HEAD"
+    revision: HEAD
 
 execution:
   adapter: my_soc_regression.adapter:Adapter
@@ -39,134 +38,111 @@ scheduler:
   max_parallel: 8
   poll_interval_s: 5.0
   config:
-    command: ["my-capacity-wrapper"]
+    command: [my-capacity-wrapper]
 ```
 
-At `prepare`, symbolic source revisions are frozen into concrete evidence.
-
-## Step 2: Implement an ExecutionAdapter outside this repository
-
-Create a normal Python package in the project repository:
-
-```text
-my-soc-regression/
-  pyproject.toml
-  src/
-    my_soc_regression/
-      __init__.py
-      adapter.py
-```
-
-`adapter.py`:
+## 2. Implement the project adapter
 
 ```python
 from regorch.contracts import ExecutionAdapter
-from regorch.models import Job, JobExecution, TestResult
+from regorch.models import CheckResult, Job, JobExecution, TestResult
+from regorch.adapter_utils import run_process
 
 class Adapter(ExecutionAdapter):
+    def probe(self, context):
+        return [CheckResult("execution", "tool", "PASS", "tool reachable")]
+
     def setup(self, context):
         ...
 
     def plan(self, context):
-        return [Job(id="test_001", payload={"anything": "project-owned"})]
+        return [Job(id="pcie/dma/write/seed-001", payload={...})]
 
-    def execute(self, context, job):
-        ...
-        return JobExecution(...)
+    def execute(self, context, job, execution):
+        process = run_process(
+            ["./run_test.sh", job.id],
+            execution,
+            timeout_s=3600,
+        )
+        return JobExecution(
+            job_id=job.id,
+            started_at="...",
+            finished_at="...",
+            duration_s=process.duration_s,
+            observation=process.to_observation(),
+        )
 
     def collect(self, context, executions):
         ...
-        return [TestResult(id="test_001", status="PASS")]
 ```
 
-Install it in the same virtual environment:
+See `Adapter_Implementation_Guide.md` for stdout/stderr, timeout, Job identity,
+and result-status guidance.
 
-```bash
-pip install -e /path/to/my-soc-regression
-```
-
-Then reference it without modifying regorch:
-
-```yaml
-execution:
-  adapter: my_soc_regression.adapter:Adapter
-```
-
-A complete minimal external example is under `examples/external_adapter/`.
-
-## Adapter responsibilities
-
-### setup
-
-Prepare project-owned execution prerequisites. Examples might include build setup, environment generation, or a project command that prepares a testbench.
-
-Core does not interpret the operation.
-
-### plan
-
-Return canonical `Job` objects. The only field core interprets is `Job.id` for selection and evidence. `payload` is project-owned and JSON-serializable.
-
-### execute
-
-Execute one selected `Job` and return raw `JobExecution` evidence. `observation` is opaque to core.
-
-### collect
-
-Interpret execution observations and normalize them into `TestResult` with one of:
-
-```text
-PASS
-FAIL
-ERROR
-SKIP
-```
-
-This is where project-specific result parsing belongs.
-
-## SourceProvider: only when Git/SVN are insufficient
-
-Built-ins support any number and mixture of Git and SVN sources. If another materialization mechanism is needed, implement:
+## 3. Add project-side conformance tests
 
 ```python
-from regorch.contracts import SourceProvider
+from regorch.testing import assert_conformance, check_execution_adapter
 
-class Provider(SourceProvider):
-    def materialize(self, source, destination):
-        ...
-        return {"resolved_revision": "..."}
+
+def test_regorch_adapter(tmp_path, project_context):
+    checks = check_execution_adapter(MyAdapter(), project_context, tmp_path)
+    assert_conformance(checks)
 ```
 
-Reference it with:
+This is expected integration work, not optional polish. Run it before the adapter
+is accepted into a nightly regression environment.
 
-```yaml
-provider: company_sources.internal:Provider
+## 4. Run doctor on the actual machine
+
+```bash
+reg doctor regression.yaml
 ```
 
-## CapacityProvider: often a wrapper command is enough
+This catches missing tools, repository access problems, adapter probe failures,
+and capacity query failures before source materialization or regression start.
 
-Before writing Python, prefer the generic command provider. The command only needs to print one non-negative integer:
+## 5. Validate the plan
+
+```bash
+reg prepare regression.yaml
+reg setup regression.yaml
+reg plan regression.yaml
+reg dry-run regression.yaml
+```
+
+Check that Job IDs are stable and that the chosen Job granularity matches the
+rerun granularity the team wants.
+
+## 6. Capacity integration
+
+Prefer the command provider first. The wrapper prints one non-negative integer:
 
 ```text
 3
 ```
 
-That means "this orchestrator may currently have at most 3 jobs running".
+Only write a custom CapacityProvider if that boundary is insufficient.
 
-Only implement a custom provider if that tiny command boundary is insufficient.
+## 7. Source integration
 
-## Integration checklist
+Built-in Git/SVN can be mixed in arbitrary count. Implement a custom
+SourceProvider only for a materially different source materialization mechanism.
 
-Before using a new adapter in a real regression:
+## Integration acceptance checklist
 
 ```text
-[ ] setup is idempotent enough for repeated orchestration
-[ ] plan returns stable unique IDs
-[ ] job payload is JSON-serializable
-[ ] execute returns one JobExecution per submitted Job
-[ ] collect returns exactly one TestResult per execution
-[ ] collect uses only canonical statuses
-[ ] secrets are not written into YAML/context evidence
+[ ] reg doctor passes on a representative execution machine
+[ ] project adapter conformance pytest passes
+[ ] setup can be repeated safely
+[ ] plan returns stable unique Job IDs
+[ ] Job granularity matches desired rerun granularity
+[ ] Job payloads are JSON serializable
+[ ] large stdout/stderr goes to files, not Python memory/JSON
+[ ] timeout/process-group behavior is defined
+[ ] shell=True is not used; shell policy lives in project wrapper scripts
+[ ] collect distinguishes FAIL from infrastructure ERROR
+[ ] secrets are absent from context/result/check messages
 [ ] source revisions needed for reproduction are frozen by prepare
-[ ] a dry-run clearly shows the selected jobs before execution
-[ ] project adapter tests exist outside core tests
+[ ] dry-run clearly shows intended selection before execution
 ```

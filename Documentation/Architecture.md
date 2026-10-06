@@ -2,46 +2,39 @@
 
 ## Purpose
 
-`regorch` is a small regression **orchestrator**, not a simulator wrapper, test framework, source-control client, or farm scheduler.
+`regorch` is a small regression **orchestrator**. It is not a simulator wrapper,
+test framework, SCM client, or farm scheduler.
 
-Its job is to preserve and execute one generic lifecycle:
+Its generic lifecycle is:
 
 ```text
-human intent
 regression.yaml
       |
-      v
-   PREPARE  ---- SourceProvider ----> materialized sources
+   doctor        optional, non-destructive connection checks
       |
-      v
+   prepare  ---- SourceProvider ----> materialized sources
+      |
  context.json
       |
-      v
-    SETUP   ---- ExecutionAdapter ---> project-owned setup
+    setup   ---- ExecutionAdapter ---> project setup
       |
-      v
-    PLAN    <--- ExecutionAdapter ---- opaque jobs
+    plan    <--- ExecutionAdapter ---- canonical Jobs
       |
-      v
   plan.json
       |
-      v
-  SELECT / DRY-RUN
+ select / dry-run
       |
-      v
-     RUN    ---- CapacityProvider ---> current slot allowance
-      |      ---- ExecutionAdapter ---> concrete execution
-      v
+     run    ---- CapacityProvider ---> current concurrency allowance
+      |      ---- ExecutionAdapter ---> project execution
+      |
  run.json + executions.json
       |
-      v
-   COLLECT  <--- ExecutionAdapter ---- project-specific interpretation
+   collect  <--- ExecutionAdapter ---- project interpretation
       |
-      v
  result.json
 ```
 
-The durable evidence chain is:
+The durable evidence chain remains:
 
 ```text
 Context -> Plan -> Run -> Result
@@ -52,93 +45,140 @@ Context -> Plan -> Run -> Result
 Core may know:
 
 - lifecycle ordering;
-- canonical `Job`, `JobExecution`, and `TestResult` models;
+- canonical `Job`, `ExecutionContext`, `JobExecution`, and `TestResult` models;
 - ID-based selection;
-- concurrency and polling mechanics;
+- generic concurrency and polling;
+- per-job directory allocation;
 - evidence persistence;
-- generic plugin contracts.
+- plugin loading/contracts;
+- connection-check orchestration.
 
 Core must not know:
 
-- how VCS, QEMU, a board, or another execution target starts;
+- how VCS/QEMU/board/formal tools are started;
 - what a testcase command means;
-- how PASS/FAIL is found in project logs;
-- Git or SVN command semantics;
-- LSF, Slurm, proprietary farm, or host-load semantics.
+- how project PASS/FAIL is extracted;
+- Git/SVN command semantics;
+- LSF/Slurm/proprietary farm semantics.
 
-Those details belong behind contracts.
+Concrete behavior remains behind three boundaries:
 
-## Extension boundaries
+```text
+ExecutionAdapter
+SourceProvider
+CapacityProvider
+```
 
-### ExecutionAdapter
+## ExecutionAdapter
 
 ```python
+probe(context) -> list[CheckResult]
 setup(context)
 plan(context) -> list[Job]
-execute(context, job) -> JobExecution
+execute(context, job, execution_context) -> JobExecution
 collect(context, executions) -> list[TestResult]
 ```
 
-The `Job.payload` and `JobExecution.observation` fields are opaque to core.
+`Job.payload` and `JobExecution.observation` are opaque to core.
 
-### SourceProvider
+### Job
+
+A Job is the smallest independently schedulable and useful rerunnable unit. It
+is not necessarily one testcase. The project decides the granularity.
+
+Core requires IDs to be unique, non-empty, free of control characters, and
+stable enough to support selection/rerun semantics. Stability across runs is a
+project contract and is checked by the conformance kit under a fixed context.
+
+### ExecutionContext
+
+Core creates one isolated filesystem context per selected Job:
+
+```text
+runs/<run-id>/jobs/<safe-id>/
+  work/
+  artifacts/
+  logs/
+    stdout.log
+    stderr.log
+```
+
+The adapter receives these paths but owns all project behavior inside them.
+Core records only generic relative path evidence.
+
+## Adapter process utility
+
+`regorch.adapter_utils.run_process` is provided for adapter authors. It is not
+part of core scheduling semantics. It standardizes the safe/default subprocess
+pattern:
+
+```text
+shell=False
+stdin=DEVNULL
+stdout/stderr -> files
+start_new_session=True
+timeout -> process-group SIGTERM -> grace -> SIGKILL
+```
+
+This avoids buffering large simulator logs in memory or canonical JSON.
+
+## SourceProvider
 
 ```python
+probe(source) -> list[CheckResult]
 materialize(source, destination) -> resolved_evidence
 ```
 
-Built-ins currently include Git and SVN. A regression may contain any number and mixture of sources.
+Git and SVN are bundled implementations. Any number and mixture of sources is
+allowed in one regression context.
 
-### CapacityProvider
+## CapacityProvider
 
 ```python
+probe() -> list[CheckResult]
 available_slots() -> int
 ```
 
-The scheduler only computes:
+The scheduler computes:
 
 ```text
 effective_limit = min(max_parallel, available_slots())
 ```
 
+No queue/farm semantics enter core.
+
+## Connection diagnostics
+
+`reg doctor` validates the definition, loads every configured plugin, and runs
+non-destructive provider/adapter probes. It does not prepare sources or run jobs.
+
+The reusable `regorch.testing` conformance kit separately verifies implementation
+contracts for project-side pytest suites.
+
 ## Project-owned extensions
 
-A project should normally **not edit regorch core**. Install its own Python package and reference a class with `module:Class`:
+Projects should normally not edit regorch core. Install a project package and
+reference it using `module:Class`:
 
 ```yaml
 execution:
   adapter: my_soc_verification.regression:Adapter
 ```
 
-The same form is supported for source and capacity providers when the built-ins are insufficient.
-
-Short names such as `demo_linux`, `git`, `svn`, and `fixed` resolve to bundled plugins.
-
-## Workspace boundary
-
-By default, relative workspace paths are based on the directory from which `reg` is invoked:
-
-```text
-$PWD/
-  regression.yaml
-  work/
-    sources/
-    exec/
-    .reg/
-  runs/
-```
-
-This makes the invocation directory the physical boundary of one regression workspace while keeping repository locations declarative.
+The same external-plugin form is supported for source and capacity providers.
 
 ## Architecture enforcement
 
-The architecture is executable, not only documented. The test suite checks:
+Tests enforce that:
 
-- root/core modules do not import concrete adapter/source/capacity implementations;
-- root/core modules do not execute project commands directly;
-- extension contracts retain their deliberately small method surfaces;
-- bundled plugins implement the declared contracts;
-- external `module:Class` plugins load without modifying core;
-- required architecture and ADR documents remain present.
+- core modules do not import concrete adapters/source/capacity providers;
+- core modules do not spawn project subprocesses;
+- extension signatures remain deliberate;
+- project plugins load without core edits;
+- per-job execution contexts are isolated;
+- process utility streams logs and terminates timed-out process groups;
+- doctor reports connection failures without preparing a context;
+- required architecture/ADR documents remain present.
 
-See `Documentation/Architecture_Contract.md` and `tests/test_architecture_contracts.py`.
+See `Architecture_Contract.md`, `Adapter_Implementation_Guide.md`, and
+`Adapter_Conformance_Testing.md`.
