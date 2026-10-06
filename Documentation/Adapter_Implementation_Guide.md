@@ -136,6 +136,36 @@ Use `FAIL` for a test that ran and found a verification failure. Use `ERROR` for
 infrastructure/execution failure such as timeout, missing runtime dependency, or
 broken harness. This distinction is important for closure statistics.
 
+The minimum collected result contract is `Job ID + canonical status + list[str]`
+artifact references. Artifact references are opaque; they are often paths, but
+Mockingbird does not require or interpret that.
+
+For the common case:
+
+```python
+from mockingbird.adapter_utils import execution_path_refs, result_from_execution
+
+def collect(self, context, executions):
+    results = []
+    for execution in executions:
+        # Project-owned interpretation.
+        rc = int(execution.observation["returncode"])
+        status = "PASS" if rc == 0 else "FAIL"
+        results.append(
+            result_from_execution(
+                execution,
+                status,
+                artifacts=execution_path_refs(execution, "stdout", "stderr"),
+            )
+        )
+    return results
+```
+
+For VCS, board tests, or another system, keep exactly the same envelope and
+replace only the project-owned interpretation/artifact discovery. The helpers do
+not parse logs, discover waveforms, or decide PASS/FAIL; they only remove
+repetitive Mockingbird plumbing.
+
 ## 3. Process execution guidance
 
 For normal Linux subprocess-based adapters, prefer:

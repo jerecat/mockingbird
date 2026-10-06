@@ -3,7 +3,7 @@ from __future__ import annotations
 import shutil
 from datetime import datetime, timezone
 
-from mockingbird.adapter_utils import run_process
+from mockingbird.adapter_utils import execution_path_refs, result_from_execution, run_process
 from mockingbird.contracts import ExecutionAdapter
 from mockingbird.models import CheckResult, ExecutionContext, Job, JobExecution, TestResult
 
@@ -59,12 +59,11 @@ class Adapter(ExecutionAdapter):
             timed_out = bool(item.observation.get("timed_out", False))
             rc = int(item.observation["returncode"])
             results.append(
-                TestResult(
-                    id=item.job_id,
-                    status="ERROR" if timed_out else ("PASS" if rc == 0 else "FAIL"),
-                    duration_s=item.duration_s,
+                result_from_execution(
+                    item,
+                    "ERROR" if timed_out else ("PASS" if rc == 0 else "FAIL"),
                     reason="timeout" if timed_out else (None if rc == 0 else f"exit={rc}"),
-                    metadata={"stdout": item.paths.get("stdout"), "stderr": item.paths.get("stderr")},
+                    artifacts=execution_path_refs(item, "stdout", "stderr"),
                 )
             )
         return results

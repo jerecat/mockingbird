@@ -46,7 +46,7 @@ scheduler:
 ```python
 from mockingbird.contracts import ExecutionAdapter
 from mockingbird.models import CheckResult, Job, JobExecution, TestResult
-from mockingbird.adapter_utils import run_process
+from mockingbird.adapter_utils import execution_path_refs, result_from_execution, run_process
 
 class Adapter(ExecutionAdapter):
     def probe(self, context):
@@ -73,7 +73,17 @@ class Adapter(ExecutionAdapter):
         )
 
     def collect(self, context, executions):
-        ...
+        results = []
+        for execution in executions:
+            rc = int(execution.observation["returncode"])  # project policy
+            results.append(
+                result_from_execution(
+                    execution,
+                    "PASS" if rc == 0 else "FAIL",
+                    artifacts=execution_path_refs(execution, "stdout", "stderr"),
+                )
+            )
+        return results
 ```
 
 See `Adapter_Implementation_Guide.md` for stdout/stderr, timeout, Job identity,
@@ -141,6 +151,9 @@ SourceProvider only for a materially different source materialization mechanism.
 [ ] large stdout/stderr goes to files, not Python memory/JSON
 [ ] timeout/process-group behavior is defined
 [ ] shell=True is not used; shell policy lives in project wrapper scripts
+[ ] collect returns one matching result per executed Job
+[ ] collect returns canonical PASS/FAIL/ERROR/SKIP status
+[ ] collect returns needed artifact references as opaque strings
 [ ] collect distinguishes FAIL from infrastructure ERROR
 [ ] secrets are absent from context/result/check messages
 [ ] source revisions needed for reproduction are frozen by prepare

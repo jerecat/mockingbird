@@ -60,7 +60,9 @@ The execution helper verifies:
 - Jobs are JSON serializable;
 - sample `execute()` returns the same Job ID;
 - `JobExecution` is JSON serializable;
-- sample `collect()` returns one matching canonical result.
+- sample `collect()` returns one matching canonical result;
+- collected status is PASS/FAIL/ERROR/SKIP;
+- collected artifacts are an opaque `list[str]`.
 
 `exercise_execute=False` may be used for a fast structural test when the real
 system is not available in ordinary unit-test environments.
