@@ -108,7 +108,55 @@ v0.x API details are not architecture invariants.
 
 Public APIs may evolve while the architectural meaning remains stable.
 
-## Principle 6: Maintenance cost is a first-class design constraint
+## Principle 6: Do not standardize what Mockingbird does not understand
+
+Different projects produce fundamentally different execution evidence.
+
+A simple command may leave only stdout, stderr, and a return code. A simulator
+may leave logs, waveforms, traces, coverage databases, and other project-owned
+artifacts. A board test may leave UART logs, dumps, or files with completely
+different semantics.
+
+Mockingbird must not invent a common artifact taxonomy merely to make these
+systems look uniform.
+
+The project-owned collector interprets project evidence and determines the
+result. Mockingbird records the returned result and preserves enough association
+to trace it back to its Job, Execution, and project-owned files/evidence where
+available.
+
+```text
+project execution
+      |
+      +-- arbitrary logs / artifacts / observations
+      |
+project-owned collector
+      |
+      +-- interprets project-specific meaning
+      |
+      v
+TestResult
+      |
+Mockingbird records and associates; it does not reinterpret
+```
+
+In particular:
+
+- Mockingbird does not determine why a test passed or failed;
+- a reason string is project-owned and may be absent;
+- artifact names, formats, and semantics are project-owned;
+- heterogeneous evidence should remain opaque rather than being forced into a
+  speculative common schema;
+- preserving traceability does not require understanding the evidence.
+
+A useful rule is:
+
+> **Do not standardize what Mockingbird does not understand.**
+
+If repeated real integrations later reveal a genuinely common evidence concept,
+it may be promoted deliberately.
+
+## Principle 7: Maintenance cost is a first-class design constraint
 
 Every abstraction, option, plugin hook, and dependency creates future work.
 

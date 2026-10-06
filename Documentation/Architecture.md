@@ -97,6 +97,40 @@ collect(context, executions) -> list[TestResult]
 
 `Job.payload` and `JobExecution.observation` are opaque to core.
 
+### Collection and heterogeneous evidence
+
+Collection is project interpretation, not core interpretation.
+
+```text
+Execution
+   |
+   +-- arbitrary project files / observations
+   |
+   v
+project-owned collect()
+   |
+   +-- determines canonical result
+   |
+   v
+TestResult
+   |
+   v
+Mockingbird persists association/provenance
+```
+
+A trivial command may expose only logs and a return code. VCS may expose a
+simulation log, FSDB, Tarmac, coverage data, or other outputs. Other tools may
+produce completely different evidence.
+
+Mockingbird does not define what those artifacts mean and does not require them
+to fit a common taxonomy. The collector may return project-specific reason or
+metadata when useful, but core treats such information as opaque.
+
+The architectural requirement is traceability: a recorded result remains
+associated with its Job/Execution and with project-owned evidence references
+that the integration chooses to preserve. Traceability does not imply that core
+understands or validates the evidence.
+
 ### Job
 
 A Job is the smallest independently schedulable and useful rerunnable unit. It

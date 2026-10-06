@@ -118,3 +118,17 @@ new abstraction solely for hypothetical future users.
 
 Prefer a project-owned adapter/provider/wrapper until repeated real integrations
 prove that a behavior is genuinely common.
+
+## AC-15: Project evidence remains opaque
+
+Project-owned collection determines the result. Core must not infer PASS/FAIL
+reasons from simulator logs, return codes, waveforms, traces, coverage databases,
+board output, or other project-specific evidence.
+
+Mockingbird may preserve associations/references so that a result can be traced
+back to its Job, Execution, and project-owned evidence, but it must not require
+heterogeneous artifacts to conform to a speculative common taxonomy.
+
+A reason, artifact classification, or richer evidence schema is not mandatory
+merely for uniformity. Promote such concepts only after repeated real
+integrations demonstrate a stable common meaning.
