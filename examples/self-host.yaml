@@ -1,4 +1,4 @@
-name: regorch-self-host
+name: mockingbird-self-host
 workspace: ./work-self
 run_root: ./runs-self
 sources: []

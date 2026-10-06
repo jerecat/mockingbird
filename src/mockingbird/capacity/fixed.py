@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from regorch.contracts import CapacityProvider
-from regorch.models import CheckResult
+from mockingbird.contracts import CapacityProvider
+from mockingbird.models import CheckResult
 
 
 class Provider(CapacityProvider):

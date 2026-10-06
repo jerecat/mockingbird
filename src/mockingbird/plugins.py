@@ -27,7 +27,7 @@ def _load_class(category: str, spec: str, default_class: str, contract: type[_T]
             raise ValueError(
                 f"invalid built-in plugin name {spec!r}; external plugins use module:Class"
             )
-        module_name = f"regorch.{category}.{spec}"
+        module_name = f"mockingbird.{category}.{spec}"
         class_name = default_class
 
     module = importlib.import_module(module_name)

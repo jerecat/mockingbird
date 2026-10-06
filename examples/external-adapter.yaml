@@ -4,9 +4,9 @@ run_root: ./runs-external
 sources: []
 
 execution:
-  # This module is NOT inside the regorch package. Install the example first:
+  # This module is NOT inside the mockingbird package. Install the example first:
   #   pip install -e examples/external_adapter
-  adapter: example_regorch_adapter.adapter:Adapter
+  adapter: example_mockingbird_adapter.adapter:Adapter
   config:
     tests:
       - id: external_pwd

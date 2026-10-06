@@ -145,7 +145,7 @@ def prepare(defn: dict[str, Any]) -> dict[str, Any]:
         "schema_version": 1,
         "name": defn.get("name", "regression"),
         "prepared_at": _now(),
-        "orchestrator": {"name": "regorch", "version": __version__},
+        "orchestrator": {"name": "mockingbird", "version": __version__},
         "definition_path": defn["_definition_path"],
         "invocation_dir": defn["_invocation_dir"],
         "paths": {
@@ -166,7 +166,7 @@ def prepare(defn: dict[str, Any]) -> dict[str, Any]:
 def load_context(defn: dict[str, Any]) -> dict[str, Any]:
     path = metadata_path(defn) / "context.json"
     if not path.exists():
-        raise RuntimeError("context not prepared; run 'reg prepare' first")
+        raise RuntimeError("context not prepared; run 'mockingbird prepare' first")
     return read_json(path)
 
 

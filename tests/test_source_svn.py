@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from regorch.sources import svn
+from mockingbird.sources import svn
 
 
 def test_svn_provider_contract_is_isolated_behind_provider(tmp_path, monkeypatch):

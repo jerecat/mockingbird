@@ -3,7 +3,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from regorch.sources.git import Provider
+from mockingbird.sources.git import Provider
 
 
 def _run(args: list[str], cwd: Path) -> str:

@@ -6,14 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from regorch.adapters.demo_linux import Adapter as DemoLinuxAdapter
-from regorch.adapters.selftest import Adapter as SelfTestAdapter
-from regorch.capacity.command import Provider as CommandCapacityProvider
-from regorch.capacity.fixed import Provider as FixedCapacityProvider
-from regorch.contracts import CapacityProvider, ExecutionAdapter, SourceProvider
-from regorch.plugins import load_adapter, load_capacity_provider, load_source_provider
-from regorch.sources.git import Provider as GitSourceProvider
-from regorch.sources.svn import Provider as SvnSourceProvider
+from mockingbird.adapters.demo_linux import Adapter as DemoLinuxAdapter
+from mockingbird.adapters.selftest import Adapter as SelfTestAdapter
+from mockingbird.capacity.command import Provider as CommandCapacityProvider
+from mockingbird.capacity.fixed import Provider as FixedCapacityProvider
+from mockingbird.contracts import CapacityProvider, ExecutionAdapter, SourceProvider
+from mockingbird.plugins import load_adapter, load_capacity_provider, load_source_provider
+from mockingbird.sources.git import Provider as GitSourceProvider
+from mockingbird.sources.svn import Provider as SvnSourceProvider
 
 
 def test_extension_contracts_have_deliberately_small_abstract_surfaces():
@@ -40,7 +40,7 @@ def test_builtin_plugins_implement_only_the_declared_boundaries():
 def test_external_module_class_adapter_can_be_loaded_without_editing_core(tmp_path, monkeypatch):
     module = tmp_path / "project_adapter.py"
     module.write_text(
-        "from regorch.contracts import ExecutionAdapter\n"
+        "from mockingbird.contracts import ExecutionAdapter\n"
         "class ProjectAdapter(ExecutionAdapter):\n"
         "    def setup(self, context): pass\n"
         "    def plan(self, context): return []\n"
@@ -65,7 +65,7 @@ def test_external_plugins_are_rejected_when_they_do_not_implement_contract(tmp_p
 def test_external_source_and_capacity_plugins_can_be_loaded_without_editing_core(tmp_path, monkeypatch):
     module = tmp_path / "project_plugins.py"
     module.write_text(
-        "from regorch.contracts import SourceProvider, CapacityProvider\n"
+        "from mockingbird.contracts import SourceProvider, CapacityProvider\n"
         "class ProjectSource(SourceProvider):\n"
         "    def materialize(self, source, destination): return {\"resolved_revision\": \"demo\"}\n"
         "class ProjectCapacity(CapacityProvider):\n"

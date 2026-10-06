@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from regorch.context import load_definition
-from regorch.doctor import doctor_failed, run_doctor
+from mockingbird.context import load_definition
+from mockingbird.doctor import doctor_failed, run_doctor
 
 
 def test_doctor_checks_linux_sanity_without_preparing_workspace(tmp_path, monkeypatch):
@@ -44,7 +44,7 @@ execution:
   config:
     tests:
       - id: missing
-        command: [definitely-not-a-real-regorch-command]
+        command: [definitely-not-a-real-mockingbird-command]
 scheduler:
   capacity_provider: fixed
   config: {slots: 1}

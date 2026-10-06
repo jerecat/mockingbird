@@ -57,7 +57,7 @@ def _print_checklist(context: dict, selected, selection_meta: dict) -> None:
     for job in selected[:preview_limit]:
         print(f"       - {job.id}")
     if len(selected) > preview_limit:
-        print(f"       ... {len(selected) - preview_limit} more (use reg plan for full list)")
+        print(f"       ... {len(selected) - preview_limit} more (use mockingbird plan for full list)")
 
 
 def _confirm() -> bool:
@@ -70,7 +70,7 @@ def _summary(result: dict) -> str:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="reg")
+    parser = argparse.ArgumentParser(prog="mockingbird")
     sub = parser.add_subparsers(dest="command", required=True)
 
     for name in ("doctor", "prepare", "setup", "collect", "status", "all"):

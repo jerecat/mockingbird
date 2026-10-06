@@ -30,7 +30,7 @@ execute(context, job, execution_context)
 
 Core still does not know what command or simulator is executed.
 
-A reusable adapter utility, `regorch.adapter_utils.run_process`, is provided with
+A reusable adapter utility, `mockingbird.adapter_utils.run_process`, is provided with
 these defaults/contracts:
 
 - `shell=False` only;

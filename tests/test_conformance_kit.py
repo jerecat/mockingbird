@@ -4,12 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from regorch.adapters.demo_linux import Adapter
-from regorch.capacity.fixed import Provider as FixedCapacity
-from regorch.context import load_definition, provisional_context
-from regorch.contracts import SourceProvider
-from regorch.models import CheckResult
-from regorch.testing import (
+from mockingbird.adapters.demo_linux import Adapter
+from mockingbird.capacity.fixed import Provider as FixedCapacity
+from mockingbird.context import load_definition, provisional_context
+from mockingbird.contracts import SourceProvider
+from mockingbird.models import CheckResult
+from mockingbird.testing import (
     assert_conformance,
     check_capacity_provider,
     check_execution_adapter,

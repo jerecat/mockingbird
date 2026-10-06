@@ -8,6 +8,15 @@ python3 -m venv .venv
 python -m pip install -e '.[dev]'
 ```
 
+The package installs both the full command and a short alias:
+
+```bash
+mockingbird --help
+mb --help
+```
+
+Both are registered in `pyproject.toml` and invoke the same CLI entry point.
+
 ## 2. Run repository tests
 
 ```bash
@@ -23,7 +32,7 @@ make test
 ## 3. Check connections before doing work
 
 ```bash
-reg doctor examples/sanity-linux.yaml
+mockingbird doctor examples/sanity-linux.yaml
 ```
 
 `doctor` is non-destructive: it validates configuration, plugin loading,
@@ -33,7 +42,7 @@ frozen context or starting Jobs.
 ## 4. Run zero-integration Linux sanity
 
 ```bash
-reg all examples/sanity-linux.yaml
+mockingbird all examples/sanity-linux.yaml
 ```
 
 or:
@@ -65,19 +74,19 @@ runs/<run-id>/jobs/<job>/
 ## 6. Exercise lifecycle manually
 
 ```bash
-reg doctor examples/sanity-linux.yaml
-reg prepare examples/sanity-linux.yaml
-reg setup examples/sanity-linux.yaml
-reg plan examples/sanity-linux.yaml
-reg dry-run examples/sanity-linux.yaml
-reg run examples/sanity-linux.yaml --interactive
-reg collect examples/sanity-linux.yaml
+mockingbird doctor examples/sanity-linux.yaml
+mockingbird prepare examples/sanity-linux.yaml
+mockingbird setup examples/sanity-linux.yaml
+mockingbird plan examples/sanity-linux.yaml
+mockingbird dry-run examples/sanity-linux.yaml
+mockingbird run examples/sanity-linux.yaml --interactive
+mockingbird collect examples/sanity-linux.yaml
 ```
 
-## 7. Run regorch through itself
+## 7. Run mockingbird through itself
 
 ```bash
-reg all examples/self-host.yaml
+mockingbird all examples/self-host.yaml
 ```
 
 or:
@@ -95,4 +104,4 @@ Read in this order:
 3. `Integration_Guide.md`
 
 The normal goal is: add a project-owned adapter package and YAML, not modify
-regorch core.
+mockingbird core.

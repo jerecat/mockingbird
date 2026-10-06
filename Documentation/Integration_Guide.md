@@ -6,7 +6,7 @@
 |---|---:|---|
 | regression definition | yes | project `regression.yaml` |
 | execution behavior | yes | project `ExecutionAdapter` package |
-| adapter tests | yes | project pytest suite using `regorch.testing` |
+| adapter tests | yes | project pytest suite using `mockingbird.testing` |
 | source acquisition | usually no | built-in Git/SVN or custom SourceProvider |
 | capacity query | sometimes | command provider or custom CapacityProvider |
 
@@ -44,9 +44,9 @@ scheduler:
 ## 2. Implement the project adapter
 
 ```python
-from regorch.contracts import ExecutionAdapter
-from regorch.models import CheckResult, Job, JobExecution, TestResult
-from regorch.adapter_utils import run_process
+from mockingbird.contracts import ExecutionAdapter
+from mockingbird.models import CheckResult, Job, JobExecution, TestResult
+from mockingbird.adapter_utils import run_process
 
 class Adapter(ExecutionAdapter):
     def probe(self, context):
@@ -82,10 +82,10 @@ and result-status guidance.
 ## 3. Add project-side conformance tests
 
 ```python
-from regorch.testing import assert_conformance, check_execution_adapter
+from mockingbird.testing import assert_conformance, check_execution_adapter
 
 
-def test_regorch_adapter(tmp_path, project_context):
+def test_mockingbird_adapter(tmp_path, project_context):
     checks = check_execution_adapter(MyAdapter(), project_context, tmp_path)
     assert_conformance(checks)
 ```
@@ -96,7 +96,7 @@ is accepted into a nightly regression environment.
 ## 4. Run doctor on the actual machine
 
 ```bash
-reg doctor regression.yaml
+mockingbird doctor regression.yaml
 ```
 
 This catches missing tools, repository access problems, adapter probe failures,
@@ -105,10 +105,10 @@ and capacity query failures before source materialization or regression start.
 ## 5. Validate the plan
 
 ```bash
-reg prepare regression.yaml
-reg setup regression.yaml
-reg plan regression.yaml
-reg dry-run regression.yaml
+mockingbird prepare regression.yaml
+mockingbird setup regression.yaml
+mockingbird plan regression.yaml
+mockingbird dry-run regression.yaml
 ```
 
 Check that Job IDs are stable and that the chosen Job granularity matches the
@@ -132,7 +132,7 @@ SourceProvider only for a materially different source materialization mechanism.
 ## Integration acceptance checklist
 
 ```text
-[ ] reg doctor passes on a representative execution machine
+[ ] mockingbird doctor passes on a representative execution machine
 [ ] project adapter conformance pytest passes
 [ ] setup can be repeated safely
 [ ] plan returns stable unique Job IDs

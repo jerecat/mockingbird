@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`regorch` is a small regression **orchestrator**. It is not a simulator wrapper,
+`mockingbird` is a small regression **orchestrator**. It is not a simulator wrapper,
 test framework, SCM client, or farm scheduler.
 
 Its generic lifecycle is:
@@ -108,7 +108,7 @@ Core records only generic relative path evidence.
 
 ## Adapter process utility
 
-`regorch.adapter_utils.run_process` is provided for adapter authors. It is not
+`mockingbird.adapter_utils.run_process` is provided for adapter authors. It is not
 part of core scheduling semantics. It standardizes the safe/default subprocess
 pattern:
 
@@ -149,15 +149,15 @@ No queue/farm semantics enter core.
 
 ## Connection diagnostics
 
-`reg doctor` validates the definition, loads every configured plugin, and runs
+`mockingbird doctor` validates the definition, loads every configured plugin, and runs
 non-destructive provider/adapter probes. It does not prepare sources or run jobs.
 
-The reusable `regorch.testing` conformance kit separately verifies implementation
+The reusable `mockingbird.testing` conformance kit separately verifies implementation
 contracts for project-side pytest suites.
 
 ## Project-owned extensions
 
-Projects should normally not edit regorch core. Install a project package and
+Projects should normally not edit mockingbird core. Install a project package and
 reference it using `module:Class`:
 
 ```yaml

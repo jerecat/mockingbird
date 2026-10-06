@@ -6,8 +6,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from regorch.contracts import SourceProvider
-from regorch.models import CheckResult
+from mockingbird.contracts import SourceProvider
+from mockingbird.models import CheckResult
 
 
 def _run(args: list[str], *, cwd: Path | None = None, env=None) -> str:

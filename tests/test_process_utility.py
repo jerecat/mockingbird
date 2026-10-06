@@ -4,8 +4,8 @@ import sys
 import time
 from pathlib import Path
 
-from regorch.adapter_utils import run_process
-from regorch.testing import make_execution_context
+from mockingbird.adapter_utils import run_process
+from mockingbird.testing import make_execution_context
 
 
 def test_process_output_is_streamed_to_files_not_returned_in_memory(tmp_path):

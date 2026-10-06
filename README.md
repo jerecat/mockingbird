@@ -1,8 +1,8 @@
-# regorch
+# Mockingbird
 
 A deliberately small, adapter-driven regression orchestrator prototype.
 
-Current prototype version: **0.4.0**.
+Current prototype version: **0.5.0**.
 
 Core owns **when** to prepare, setup, plan, select, schedule, run, and collect.
 It does not know how VCS/QEMU/a board/formal tool starts, what a testcase command
@@ -43,7 +43,7 @@ Context -> Plan -> Run -> Result
 6. Core creates an isolated `ExecutionContext` per selected Job.
 7. Large stdout/stderr belongs in files, not Python memory or canonical JSON.
 8. Project integration should not require editing/forking core.
-9. `reg doctor` and project-side conformance tests are first-class integration gates.
+9. `mockingbird doctor` and project-side conformance tests are first-class integration gates.
 10. Architecture rules are executable tests and documented ADRs.
 
 ## Quick start
@@ -53,9 +53,18 @@ python3 -m venv .venv
 . .venv/bin/activate
 pip install -e '.[dev]'
 pytest
-reg doctor examples/sanity-linux.yaml
-reg all examples/sanity-linux.yaml
+mockingbird doctor examples/sanity-linux.yaml
+mb all examples/sanity-linux.yaml
 ```
+
+The installed CLI has two equivalent entry points:
+
+```bash
+mockingbird --help
+mb --help
+```
+
+`mb` is a short alias registered by `pyproject.toml`; it is not a shell-only alias.
 
 Or:
 
@@ -68,7 +77,7 @@ make self-demo
 
 ## Workspace/run layout
 
-Relative paths are based on the directory where `reg` is invoked.
+Relative paths are based on the directory where `mockingbird` is invoked.
 
 ```text
 $PWD/
@@ -102,20 +111,20 @@ deterministic directory name per selected Job.
 ## Lifecycle
 
 ```bash
-reg doctor regression.yaml
-reg prepare regression.yaml
-reg setup regression.yaml
-reg plan regression.yaml
-reg dry-run regression.yaml
-reg run regression.yaml --interactive
-reg collect regression.yaml
-reg status regression.yaml
+mockingbird doctor regression.yaml
+mockingbird prepare regression.yaml
+mockingbird setup regression.yaml
+mockingbird plan regression.yaml
+mockingbird dry-run regression.yaml
+mockingbird run regression.yaml --interactive
+mockingbird collect regression.yaml
+mockingbird status regression.yaml
 ```
 
 Or:
 
 ```bash
-reg all regression.yaml --interactive
+mockingbird all regression.yaml --interactive
 ```
 
 `doctor` does not materialize sources or run Jobs. It validates configuration,
@@ -142,12 +151,12 @@ Job IDs should be stable and human-readable. Do not embed timestamp/PID/run path
 ## Selection
 
 ```bash
-reg run regression.yaml --test pcie/dma/write/seed-001
-reg run regression.yaml --match 'pcie/*'
-reg plan regression.yaml --write-selection run.txt
+mockingbird run regression.yaml --test pcie/dma/write/seed-001
+mockingbird run regression.yaml --match 'pcie/*'
+mockingbird plan regression.yaml --write-selection run.txt
 vim run.txt
-reg run regression.yaml --selection run.txt
-reg run regression.yaml --failed-from runs/<explicit-run>/result.json
+mockingbird run regression.yaml --selection run.txt
+mockingbird run regression.yaml --failed-from runs/<explicit-run>/result.json
 ```
 
 There is intentionally no implicit "latest failed" source.
@@ -157,7 +166,7 @@ There is intentionally no implicit "latest failed" source.
 For normal Linux subprocess adapters, use:
 
 ```python
-from regorch.adapter_utils import run_process
+from mockingbird.adapter_utils import run_process
 
 process = run_process(
     ["./run_test.sh", "--test", job.id],
@@ -188,13 +197,13 @@ than embedding shell strings in generic Python.
 Runtime/machine health:
 
 ```bash
-reg doctor regression.yaml
+mockingbird doctor regression.yaml
 ```
 
 Implementation contract in project pytest:
 
 ```python
-from regorch.testing import assert_conformance, check_execution_adapter
+from mockingbird.testing import assert_conformance, check_execution_adapter
 
 checks = check_execution_adapter(MyAdapter(), project_context, tmp_path)
 assert_conformance(checks)

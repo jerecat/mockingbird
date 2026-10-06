@@ -30,11 +30,11 @@ def _imports(path: Path) -> set[str]:
 
 
 def test_core_does_not_import_specific_adapter_source_or_capacity_plugins():
-    root = Path(__file__).parents[1] / "src" / "regorch"
+    root = Path(__file__).parents[1] / "src" / "mockingbird"
     forbidden_prefixes = (
-        "regorch.adapters",
-        "regorch.sources",
-        "regorch.capacity",
+        "mockingbird.adapters",
+        "mockingbird.sources",
+        "mockingbird.capacity",
         "adapters.",
         "sources.",
         "capacity.",
@@ -48,7 +48,7 @@ def test_core_does_not_import_specific_adapter_source_or_capacity_plugins():
 
 
 def test_core_does_not_spawn_project_commands_directly():
-    root = Path(__file__).parents[1] / "src" / "regorch"
+    root = Path(__file__).parents[1] / "src" / "mockingbird"
     for filename in CORE_FILES:
         imports = _imports(root / filename)
         assert "subprocess" not in imports, f"{filename} should not execute project commands"

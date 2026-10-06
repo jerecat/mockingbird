@@ -96,7 +96,7 @@ def create_plan(defn: dict[str, Any]) -> dict[str, Any]:
     state = load_state(defn)
     context = load_context(defn)
     if state.get("setup_context_prepared_at") != context["prepared_at"]:
-        raise RuntimeError("setup is missing or stale; run 'reg setup' first")
+        raise RuntimeError("setup is missing or stale; run 'mockingbird setup' first")
 
     adapter = load_adapter(str(context["execution"]["adapter"]))
     jobs = adapter.plan(context)
@@ -120,11 +120,11 @@ def create_plan(defn: dict[str, Any]) -> dict[str, Any]:
 def load_plan(defn: dict[str, Any]) -> dict[str, Any]:
     path = metadata_path(defn) / "plan.json"
     if not path.exists():
-        raise RuntimeError("plan not created; run 'reg plan' first")
+        raise RuntimeError("plan not created; run 'mockingbird plan' first")
     plan = read_json(path)
     context = load_context(defn)
     if plan.get("context_prepared_at") != context.get("prepared_at"):
-        raise RuntimeError("plan is stale for the current context; run 'reg setup' and 'reg plan'")
+        raise RuntimeError("plan is stale for the current context; run 'mockingbird setup' and 'mockingbird plan'")
     return plan
 
 
@@ -234,7 +234,7 @@ def _resolve_run_dir(defn: dict[str, Any], run_dir: str | Path | None) -> Path:
     else:
         pointer = metadata_path(defn) / "last_run.json"
         if not pointer.exists():
-            raise RuntimeError("no previous run; run 'reg run' first or pass --run-dir")
+            raise RuntimeError("no previous run; run 'mockingbird run' first or pass --run-dir")
         path = Path(read_json(pointer)["run_dir"])
     if not path.is_dir():
         raise FileNotFoundError(f"run directory not found: {path}")

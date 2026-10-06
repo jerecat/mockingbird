@@ -141,7 +141,7 @@ broken harness. This distinction is important for closure statistics.
 For normal Linux subprocess-based adapters, prefer:
 
 ```python
-from regorch.adapter_utils import run_process
+from mockingbird.adapter_utils import run_process
 
 process = run_process(
     argv,
@@ -226,8 +226,8 @@ logs/       stdout/stderr and textual logs
 Run:
 
 ```bash
-reg doctor regression.yaml
+mockingbird doctor regression.yaml
 ```
 
-and add project-side tests using `regorch.testing`. See
+and add project-side tests using `mockingbird.testing`. See
 `Adapter_Conformance_Testing.md`.

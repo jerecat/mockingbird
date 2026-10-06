@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-from regorch.capacity.command import Provider
+from mockingbird.capacity.command import Provider
 
 
 def test_command_capacity_provider_reads_one_integer():

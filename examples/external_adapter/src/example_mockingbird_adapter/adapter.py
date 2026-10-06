@@ -3,9 +3,9 @@ from __future__ import annotations
 import shutil
 from datetime import datetime, timezone
 
-from regorch.adapter_utils import run_process
-from regorch.contracts import ExecutionAdapter
-from regorch.models import CheckResult, ExecutionContext, Job, JobExecution, TestResult
+from mockingbird.adapter_utils import run_process
+from mockingbird.contracts import ExecutionAdapter
+from mockingbird.models import CheckResult, ExecutionContext, Job, JobExecution, TestResult
 
 
 def _now() -> str:
@@ -13,7 +13,7 @@ def _now() -> str:
 
 
 class Adapter(ExecutionAdapter):
-    """Minimal example of a project-owned adapter installed outside regorch."""
+    """Minimal example of a project-owned adapter installed outside mockingbird."""
 
     def probe(self, context):
         commands = sorted({

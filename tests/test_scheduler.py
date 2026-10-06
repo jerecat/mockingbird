@@ -4,8 +4,8 @@ import threading
 import time
 from datetime import datetime, timezone
 
-from regorch.models import Job, JobExecution
-from regorch.scheduler import run_jobs
+from mockingbird.models import Job, JobExecution
+from mockingbird.scheduler import run_jobs
 
 
 class FixedCapacity:

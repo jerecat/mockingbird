@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from regorch.models import Job
-from regorch.selection import Selection, select_jobs, write_selection_file
+from mockingbird.models import Job
+from mockingbird.selection import Selection, select_jobs, write_selection_file
 
 
 def _jobs() -> list[Job]:

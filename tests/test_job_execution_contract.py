@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from regorch import lifecycle
-from regorch.context import load_definition, prepare
+from mockingbird import lifecycle
+from mockingbird.context import load_definition, prepare
 
 
 def _write(path: Path, job_id: str):

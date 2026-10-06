@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml
 
-from regorch.context import load_definition, prepare
+from mockingbird.context import load_definition, prepare
 
 
 class FakeProvider:
@@ -44,7 +44,7 @@ def test_prepare_supports_any_number_and_mix_of_sources(tmp_path, monkeypatch):
     )
 
     monkeypatch.setattr(
-        "regorch.context.load_source_provider",
+        "mockingbird.context.load_source_provider",
         lambda name: FakeProvider(name),
     )
 
@@ -73,7 +73,7 @@ def test_prepare_rejects_duplicate_source_names(tmp_path, monkeypatch):
         )
     )
     monkeypatch.setattr(
-        "regorch.context.load_source_provider",
+        "mockingbird.context.load_source_provider",
         lambda name: FakeProvider(name),
     )
 

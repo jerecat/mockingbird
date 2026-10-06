@@ -2,10 +2,10 @@
 
 Integration should be testable independently of a nightly regression.
 
-## Layer 1: `reg doctor`
+## Layer 1: `mockingbird doctor`
 
 ```bash
-reg doctor regression.yaml
+mockingbird doctor regression.yaml
 ```
 
 `doctor` is non-destructive. It validates configuration, loads all plugins, and
@@ -38,10 +38,10 @@ Probe rules:
 A project-owned adapter package should include tests similar to:
 
 ```python
-from regorch.testing import assert_conformance, check_execution_adapter
+from mockingbird.testing import assert_conformance, check_execution_adapter
 
 
-def test_regorch_adapter_contract(tmp_path, project_context):
+def test_mockingbird_adapter_contract(tmp_path, project_context):
     checks = check_execution_adapter(
         MyAdapter(),
         project_context,

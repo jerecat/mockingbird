@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "example-regorch-adapter"
+name = "example-mockingbird-adapter"
 version = "0.1.0"
 requires-python = ">=3.11"
-dependencies = ["regorch>=0.4.0"]
+dependencies = ["mockingbird>=0.5.0"]

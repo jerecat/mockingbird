@@ -14,7 +14,7 @@ regression starts makes adoption unnecessarily difficult.
 Three extension contracts expose a lightweight `probe` hook used by:
 
 ```bash
-reg doctor regression.yaml
+mockingbird doctor regression.yaml
 ```
 
 `probe` is intentionally non-destructive and should check connection/prerequisite
@@ -23,7 +23,7 @@ health rather than run a regression.
 The package also exports reusable test helpers:
 
 ```python
-from regorch.testing import (
+from mockingbird.testing import (
     check_execution_adapter,
     check_source_provider,
     check_capacity_provider,

@@ -88,13 +88,13 @@ Project integration belongs in a project-owned package.
 
 ## AC-12: Connection checks are first-class
 
-Every extension contract offers `probe`. `reg doctor` orchestrates these probes
+Every extension contract offers `probe`. `mockingbird doctor` orchestrates these probes
 without materializing sources or running regression Jobs. Missing custom probe
 logic may produce WARN; concrete connection failure produces FAIL.
 
 ## AC-13: Conformance is reusable
 
-`regorch.testing` provides execution/source/capacity conformance helpers that can
+`mockingbird.testing` provides execution/source/capacity conformance helpers that can
 be used from project-owned pytest suites. Contract changes require corresponding
 conformance and documentation updates.
 

@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import importlib.util
-import sys
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
-from regorch.adapter_utils import run_process
-from regorch.contracts import ExecutionAdapter
-from regorch.models import CheckResult, ExecutionContext, Job, JobExecution, TestResult
+from mockingbird.adapter_utils import run_process
+from mockingbird.contracts import ExecutionAdapter
+from mockingbird.models import CheckResult, ExecutionContext, Job, JobExecution, TestResult
 
 
 def _now() -> str:
@@ -15,48 +14,47 @@ def _now() -> str:
 
 
 class Adapter(ExecutionAdapter):
-    """Demo adapter that connects regorch to its own pytest suite."""
+    """Demo adapter. Command semantics intentionally stop at this boundary."""
 
     def probe(self, context):
-        available = importlib.util.find_spec("pytest") is not None
-        return [
-            CheckResult(
-                component="execution",
-                name="pytest",
-                status="PASS" if available else "FAIL",
-                message="pytest importable" if available else "pytest is not installed",
+        checks: list[CheckResult] = []
+        tests = context["execution"].get("config", {}).get("tests", [])
+        commands = sorted({str(item["command"][0]) for item in tests if item.get("command")})
+        for command in commands:
+            resolved = shutil.which(command)
+            checks.append(
+                CheckResult(
+                    component="execution",
+                    name=f"command:{command}",
+                    status="PASS" if resolved else "FAIL",
+                    message=resolved or "command not found on PATH",
+                )
             )
+        return checks or [
+            CheckResult("execution", "commands", "WARN", "no demo commands configured")
         ]
 
     def setup(self, context):
         Path(context["paths"]["adapter_workdir"]).mkdir(parents=True, exist_ok=True)
 
     def plan(self, context):
-        suites = context["execution"].get("config", {}).get("suites", [])
+        tests = context["execution"].get("config", {}).get("tests", [])
         return [
             Job(
                 id=str(item["id"]),
-                payload={"targets": list(item["targets"])},
+                payload={"command": list(item["command"])},
                 metadata=dict(item.get("metadata", {})),
             )
-            for item in suites
+            for item in tests
         ]
 
     def execute(self, context, job, execution: ExecutionContext):
         started_at = _now()
+        timeout_s = job.payload.get("timeout_s")
         process = run_process(
-            [
-                sys.executable,
-                "-m",
-                "pytest",
-                "-q",
-                "-p",
-                "no:cacheprovider",
-                *list(job.payload["targets"]),
-            ],
+            list(job.payload["command"]),
             execution,
-            cwd=context["invocation_dir"],
-            timeout_s=float(job.payload.get("timeout_s", 120.0)),
+            timeout_s=None if timeout_s is None else float(timeout_s),
         )
         return JobExecution(
             job_id=job.id,
@@ -74,10 +72,10 @@ class Adapter(ExecutionAdapter):
             timed_out = bool(observation.get("timed_out", False))
             if timed_out:
                 status = "ERROR"
-                reason = "pytest timeout"
+                reason = "timeout"
             else:
                 status = "PASS" if returncode == 0 else "FAIL"
-                reason = None if returncode == 0 else f"pytest exit={returncode}"
+                reason = None if returncode == 0 else f"exit={returncode}"
             results.append(
                 TestResult(
                     id=execution.job_id,

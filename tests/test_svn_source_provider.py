@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import regorch.sources.svn as svn_module
+import mockingbird.sources.svn as svn_module
 
 
 def test_svn_provider_contract_without_requiring_svn_binary(monkeypatch, tmp_path: Path):

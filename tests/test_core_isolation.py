@@ -14,7 +14,7 @@ def _string_literals(path: Path) -> set[str]:
 
 
 def test_core_has_no_project_or_backend_specific_literals():
-    root = Path(__file__).parents[1] / "src" / "regorch"
+    root = Path(__file__).parents[1] / "src" / "mockingbird"
     core = [
         root / "models.py",
         root / "contracts.py",
