@@ -4,6 +4,23 @@ A deliberately small, adapter-driven regression orchestrator prototype.
 
 Current prototype version: **0.5.0**.
 
+## Design philosophy
+
+**Mockingbird should not understand the system it orchestrates.**
+
+Keep the core small, keep system-specific knowledge outside it, and prefer the
+simplest implementation that satisfies the requirement. A boring tool is easier
+to inspect, debug, replace, and maintain — this is intentional and Unix-inspired.
+
+Before adding a feature to core, ask:
+
+> Does Mockingbird itself need to know this?
+
+If not, it belongs in an adapter, provider, project wrapper, or external command.
+Generalize only after the same real problem appears repeatedly.
+
+See `Documentation/Design_Principles.md`.
+
 Core owns **when** to prepare, setup, plan, select, schedule, run, and collect.
 It does not know how VCS/QEMU/a board/formal tool starts, what a testcase command
 means, how project PASS/FAIL is parsed, whether sources are Git/SVN, or how a

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import inspect
 import sys
 from pathlib import Path
 
@@ -14,18 +13,6 @@ from mockingbird.contracts import CapacityProvider, ExecutionAdapter, SourceProv
 from mockingbird.plugins import load_adapter, load_capacity_provider, load_source_provider
 from mockingbird.sources.git import Provider as GitSourceProvider
 from mockingbird.sources.svn import Provider as SvnSourceProvider
-
-
-def test_extension_contracts_have_deliberately_small_abstract_surfaces():
-    assert set(ExecutionAdapter.__abstractmethods__) == {"setup", "plan", "execute", "collect"}
-    assert set(SourceProvider.__abstractmethods__) == {"materialize"}
-    assert set(CapacityProvider.__abstractmethods__) == {"available_slots"}
-
-
-def test_all_plugin_contracts_offer_probe_for_doctor():
-    assert hasattr(ExecutionAdapter, "probe")
-    assert hasattr(SourceProvider, "probe")
-    assert hasattr(CapacityProvider, "probe")
 
 
 def test_builtin_plugins_implement_only_the_declared_boundaries():
@@ -93,6 +80,7 @@ def test_architecture_documentation_and_adrs_are_part_of_the_repository_contract
     required = [
         root / "Documentation" / "Architecture.md",
         root / "Documentation" / "Architecture_Contract.md",
+        root / "Documentation" / "Design_Principles.md",
         root / "Documentation" / "Adapter_Implementation_Guide.md",
         root / "Documentation" / "Adapter_Conformance_Testing.md",
         root / "Documentation" / "Getting_Started.md",
@@ -111,15 +99,3 @@ def test_architecture_documentation_and_adrs_are_part_of_the_repository_contract
     assert not missing, f"architecture documentation is missing: {missing}"
 
 
-def test_contract_methods_keep_expected_call_shape():
-    assert list(inspect.signature(ExecutionAdapter.probe).parameters) == ["self", "context"]
-    assert list(inspect.signature(ExecutionAdapter.setup).parameters) == ["self", "context"]
-    assert list(inspect.signature(ExecutionAdapter.plan).parameters) == ["self", "context"]
-    assert list(inspect.signature(ExecutionAdapter.execute).parameters) == [
-        "self", "context", "job", "execution"
-    ]
-    assert list(inspect.signature(ExecutionAdapter.collect).parameters) == ["self", "context", "executions"]
-    assert list(inspect.signature(SourceProvider.probe).parameters) == ["self", "source"]
-    assert list(inspect.signature(SourceProvider.materialize).parameters) == ["self", "source", "destination"]
-    assert list(inspect.signature(CapacityProvider.probe).parameters) == ["self"]
-    assert list(inspect.signature(CapacityProvider.available_slots).parameters) == ["self"]

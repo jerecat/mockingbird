@@ -1,6 +1,16 @@
 # Architecture Contract
 
-These rules are treated as executable compatibility constraints.
+These rules protect **architectural meaning**, not accidental Python API shape.
+
+Mockingbird's primary invariant is that the core does not understand the systems
+it orchestrates. The core should remain small, simple, and inexpensive to
+maintain. Project-specific knowledge stays outside it.
+
+Exact argument names, method ordering, helper functions, and other v0.x API
+shapes are not architecture invariants. They may evolve while these semantic
+boundaries remain intact.
+
+See `Design_Principles.md`.
 
 ## AC-1: Core is execution-detail blind
 
@@ -8,18 +18,14 @@ Core may orchestrate lifecycle, selection, evidence, directory allocation, and
 scheduling. It must not import concrete adapter/source/capacity implementations
 or execute project commands directly.
 
-## AC-2: Project execution crosses only ExecutionAdapter
+## AC-2: Project execution crosses only the execution boundary
 
-```text
-probe(context)
-setup(context)
-plan(context)
-execute(context, job, execution_context)
-collect(context, executions)
-```
+Only project-owned execution integration may interpret project commands,
+simulator output, board responses, or verification result rules.
 
-Only adapters interpret project commands, simulator output, board responses, or
-verification result rules.
+The current public API is implemented by `ExecutionAdapter`, but the exact
+Python method signatures are not an architecture invariant. The invariant is the
+boundary: project execution semantics must not leak into core.
 
 ## AC-3: Job identity defines rerun granularity
 
@@ -103,3 +109,12 @@ conformance and documentation updates.
 If a feature violates one of these rules, either redesign it or add an ADR that
 explicitly replaces the rule and update architecture tests in the same commit.
 Do not weaken a contract test merely to make a feature pass.
+
+## AC-14: Simplicity is an architectural requirement
+
+Core changes should introduce the minimum new knowledge and mechanism necessary.
+Do not move system-specific policy into core for convenience, and do not create a
+new abstraction solely for hypothetical future users.
+
+Prefer a project-owned adapter/provider/wrapper until repeated real integrations
+prove that a behavior is genuinely common.

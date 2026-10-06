@@ -1,0 +1,144 @@
+# Design Principles
+
+Mockingbird is intentionally a **boring tool**.
+
+That is a feature.
+
+The design follows a Unix-like preference for small tools with narrow
+responsibilities, explicit boundaries, and behavior that can be understood
+without knowing every system around them.
+
+## Principle 1: Mockingbird does not understand the system it orchestrates
+
+Mockingbird should know only what is necessary to orchestrate:
+
+```text
+Jobs exist
+    |
+capacity allows dispatch
+    |
+dispatch one Job
+    |
+receive execution evidence
+    |
+collect a canonical result
+```
+
+It should not know:
+
+- simulator semantics;
+- board/JTAG semantics;
+- project command syntax;
+- how many external scheduler jobs one command may create;
+- Git/SVN implementation details;
+- farm/queue policy;
+- project-specific PASS/FAIL parsing.
+
+Those belong outside the core.
+
+## Principle 2: Keep the core small
+
+The preferred architecture is:
+
+```text
+small core
++
+small mandatory boundaries
++
+project-owned implementation
+```
+
+A feature should not enter core merely because it may be useful.
+
+Before adding knowledge or an abstraction, ask:
+
+> Does Mockingbird itself need to know this?
+
+If the answer is no, keep it in an adapter/provider/project wrapper.
+
+## Principle 3: Prefer boring implementation
+
+Simple code is easier to inspect, test, replace, and maintain.
+
+Prefer:
+
+- plain files over hidden state;
+- explicit JSON/YAML evidence over implicit behavior;
+- argv lists over shell command strings;
+- small Python functions over framework machinery;
+- wrapper commands over scheduler-specific logic in core;
+- composition over deep inheritance;
+- one obvious control path over clever orchestration.
+
+The goal is not to make Mockingbird impressive internally.
+
+The goal is to make it dependable and easy to maintain.
+
+## Principle 4: Generalize only after real repetition
+
+Do not add an abstraction because several future systems might need it.
+
+First implement real adapters/providers. If the same mechanism repeatedly appears,
+then consider extracting a common utility.
+
+```text
+real implementation
+      |
+real implementation
+      |
+same problem appears again
+      |
+consider common utility
+```
+
+Common code should be promoted from evidence, not prediction.
+
+## Principle 5: Contracts protect meaning, not accidental API shape
+
+Architecture contracts should protect semantic boundaries:
+
+- core remains execution-detail blind;
+- dispatch is gated by capacity policy;
+- Job is the dispatch/rerun boundary;
+- canonical evidence stays generic;
+- project integration does not require core modification.
+
+Exact Python argument names, method ordering, convenience helpers, and similar
+v0.x API details are not architecture invariants.
+
+Public APIs may evolve while the architectural meaning remains stable.
+
+## Principle 6: Maintenance cost is a first-class design constraint
+
+Every abstraction, option, plugin hook, and dependency creates future work.
+
+When two designs satisfy the same requirement, prefer the one with:
+
+- fewer concepts;
+- fewer branches;
+- fewer hidden dependencies;
+- fewer mandatory interfaces;
+- easier failure diagnosis;
+- easier deletion.
+
+A useful Mockingbird feature should ideally feel unsurprising.
+
+## Review rule
+
+For every proposed feature, ask these questions in order:
+
+```text
+1. Does Mockingbird need to know this?
+        no -> keep it outside core
+
+2. Is this already a repeated real problem?
+        no -> avoid premature abstraction
+
+3. Can the same requirement be solved with a smaller interface?
+        yes -> use the smaller interface
+
+4. Will the next maintainer understand the failure boundary quickly?
+        no -> simplify
+```
+
+This is the default decision rule for Mockingbird development.

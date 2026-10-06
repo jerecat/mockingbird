@@ -5,6 +5,22 @@
 `mockingbird` is a small regression **orchestrator**. It is not a simulator wrapper,
 test framework, SCM client, or farm scheduler.
 
+## Design philosophy
+
+The most important architectural rule is:
+
+> **Mockingbird does not understand the system it orchestrates.**
+
+The core should remain small and boring. System-specific knowledge belongs
+outside the core, and abstractions should be introduced only after real repeated
+use shows that they are common. Simplicity is a maintenance feature, not a lack
+of ambition.
+
+This follows a Unix-like design preference: narrow responsibilities, explicit
+interfaces, plain evidence, and components that can be replaced independently.
+
+See `Design_Principles.md`.
+
 Its generic lifecycle is:
 
 ```text
