@@ -132,3 +132,25 @@ heterogeneous artifacts to conform to a speculative common taxonomy.
 A reason, artifact classification, or richer evidence schema is not mandatory
 merely for uniformity. Promote such concepts only after repeated real
 integrations demonstrate a stable common meaning.
+
+
+## AC-16: The collected result envelope is deliberately small
+
+The project-owned collector returns one canonical result for each executed
+Mockingbird Job. Core requires only:
+
+```text
+id          Mockingbird Job ID
+status      PASS | FAIL | ERROR | SKIP
+artifacts   list[str]
+```
+
+The collected result ID set must match the executed Job ID set.
+
+`artifacts` contains opaque references chosen by the collector. References are
+not required to be filesystem paths. Core preserves them but does not classify,
+resolve, open, validate, or interpret them. An empty artifact list is valid.
+
+Other project-owned result information may be carried as optional opaque data,
+but must not become mandatory without repeated real integrations demonstrating
+a stable common need.

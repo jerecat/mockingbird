@@ -88,6 +88,14 @@ class Adapter(ExecutionAdapter):
                         "stdout": execution.paths.get("stdout"),
                         "stderr": execution.paths.get("stderr"),
                     },
+                    artifacts=[
+                        path
+                        for path in (
+                            execution.paths.get("stdout"),
+                            execution.paths.get("stderr"),
+                        )
+                        if path is not None
+                    ],
                 )
             )
         return results

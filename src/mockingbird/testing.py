@@ -110,6 +110,10 @@ def check_execution_adapter(
             status = str(results[0].status).upper()
             if status not in _CANONICAL_STATUSES:
                 raise AssertionError(f"non-canonical status: {status!r}")
+            if not isinstance(results[0].artifacts, list) or any(
+                not isinstance(item, str) for item in results[0].artifacts
+            ):
+                raise AssertionError("artifacts must be list[str]")
             _assert_json(results[0].to_dict())
             return f"sample collect returned {status}", {"status": status}
 

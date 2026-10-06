@@ -72,3 +72,17 @@ def test_source_and_capacity_conformance_kits(tmp_path):
 def test_assert_conformance_surfaces_adapter_failures():
     with pytest.raises(AssertionError, match="bad"):
         assert_conformance([CheckResult("execution", "bad", "FAIL", "bad thing")])
+
+
+def test_result_artifact_contract_is_opaque_string_list():
+    from mockingbird.models import TestResult
+
+    result = TestResult(
+        id="job-a",
+        status="FAIL",
+        artifacts=["logs/sim.log", "artifact://project-owned-reference"],
+    )
+    assert result.to_dict()["artifacts"] == [
+        "logs/sim.log",
+        "artifact://project-owned-reference",
+    ]

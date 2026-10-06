@@ -126,10 +126,24 @@ Mockingbird does not define what those artifacts mean and does not require them
 to fit a common taxonomy. The collector may return project-specific reason or
 metadata when useful, but core treats such information as opaque.
 
+The result envelope has one deliberately small contract:
+
+```text
+TestResult
+  id          Mockingbird Job ID
+  status      PASS | FAIL | ERROR | SKIP
+  artifacts   list[str]
+```
+
+`artifacts` is a list of opaque references supplied by the project collector.
+A reference will often be a path, but Mockingbird does not require it to be a
+path, does not classify it, and does not derive the result from it. An empty list
+is valid.
+
 The architectural requirement is traceability: a recorded result remains
-associated with its Job/Execution and with project-owned evidence references
-that the integration chooses to preserve. Traceability does not imply that core
-understands or validates the evidence.
+associated with its Job/Execution and with the opaque artifact references the
+integration chooses to preserve. Traceability does not imply that core
+understands or validates the referenced evidence.
 
 ### Job
 

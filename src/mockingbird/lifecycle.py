@@ -260,6 +260,12 @@ def _validate_results(
             raise ValueError(
                 f"adapter returned invalid status {test.status!r} for test {test.id!r}"
             )
+        if not isinstance(test.artifacts, list) or any(
+            not isinstance(item, str) for item in test.artifacts
+        ):
+            raise ValueError(
+                f"adapter returned invalid artifacts for test {test.id!r}; expected list[str]"
+            )
         json.dumps(test.to_dict())
     return tests
 

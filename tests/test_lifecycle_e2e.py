@@ -66,6 +66,9 @@ def test_context_plan_run_result_evidence_chain_and_failed_rerun(tmp_path, monke
         "skip": 0,
     }
     assert first_result["duration_s"] is not None
+    for test in first_result["tests"]:
+        assert test["artifacts"]
+        assert all(isinstance(item, str) for item in test["artifacts"])
     for name in ("context.json", "plan.json", "run.json", "executions.json", "result.json"):
         assert (first_run / name).exists()
 

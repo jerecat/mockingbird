@@ -149,6 +149,16 @@ In particular:
   speculative common schema;
 - preserving traceability does not require understanding the evidence.
 
+The minimal collected result envelope is intentionally small:
+
+```text
+Job ID + canonical status + opaque artifact references
+```
+
+Artifact references are strings. They will often be paths, but Mockingbird does
+not care what namespace or format they use. It stores the references; the
+project owns their meaning.
+
 A useful rule is:
 
 > **Do not standardize what Mockingbird does not understand.**
