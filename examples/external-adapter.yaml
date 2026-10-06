@@ -1,0 +1,22 @@
+name: external-adapter-demo
+workspace: ./work-external
+run_root: ./runs-external
+sources: []
+
+execution:
+  # This module is NOT inside the regorch package. Install the example first:
+  #   pip install -e examples/external_adapter
+  adapter: example_regorch_adapter.adapter:Adapter
+  config:
+    tests:
+      - id: external_pwd
+        command: ["pwd"]
+      - id: external_list
+        command: ["ls", "-la"]
+
+scheduler:
+  capacity_provider: fixed
+  max_parallel: 1
+  poll_interval_s: 0.1
+  config:
+    slots: 1

@@ -1,0 +1,29 @@
+name: regorch-self-host
+workspace: ./work-self
+run_root: ./runs-self
+sources: []
+
+execution:
+  adapter: selftest
+  config:
+    suites:
+      - id: architecture_contracts
+        targets:
+          - tests/test_architecture_contracts.py
+          - tests/test_core_boundaries.py
+          - tests/test_core_isolation.py
+      - id: lifecycle
+        targets:
+          - tests/test_lifecycle_e2e.py
+          - tests/test_e2e.py
+      - id: selection_and_scheduler
+        targets:
+          - tests/test_selection.py
+          - tests/test_scheduler.py
+
+scheduler:
+  capacity_provider: fixed
+  max_parallel: 2
+  poll_interval_s: 0.1
+  config:
+    slots: 2

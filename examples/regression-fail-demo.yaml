@@ -1,0 +1,22 @@
+name: linux-command-fail-demo
+workspace: ./work
+run_root: ./runs
+sources: []
+
+execution:
+  adapter: demo_linux
+  config:
+    tests:
+      - id: passing_test
+        command: ["ls", "-la"]
+      - id: failing_test
+        command: ["sh", "-c", "exit 7"]
+      - id: another_passing_test
+        command: ["mkdir", "-p", "another_scratch"]
+
+scheduler:
+  capacity_provider: fixed
+  max_parallel: 2
+  poll_interval_s: 0.2
+  config:
+    slots: 2

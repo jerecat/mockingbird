@@ -1,0 +1,14 @@
+.venv/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+work/
+runs/
+work-self/
+runs-self/
+work-external/
+runs-external/

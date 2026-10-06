@@ -1,0 +1,24 @@
+name: linux-sanity
+workspace: ./work
+run_root: ./runs
+sources: []
+
+execution:
+  adapter: demo_linux
+  config:
+    tests:
+      - id: pwd
+        command: ["pwd"]
+      - id: list_directory
+        command: ["ls", "-la"]
+      - id: make_directory
+        command: ["mkdir", "-p", "sanity_mkdir"]
+      - id: remove_directory
+        command: ["rm", "-rf", "sanity_remove"]
+
+scheduler:
+  capacity_provider: fixed
+  max_parallel: 2
+  poll_interval_s: 0.1
+  config:
+    slots: 2

@@ -1,0 +1,26 @@
+name: linux-command-demo
+
+# Relative paths are intentionally resolved from the directory where `reg` is invoked.
+workspace: ./work
+run_root: ./runs
+
+# Any number of sources may be listed. The demo itself needs none.
+sources: []
+
+execution:
+  adapter: demo_linux
+  config:
+    tests:
+      - id: mkdir_demo
+        command: ["mkdir", "-p", "mkdir_demo_scratch"]
+      - id: list_demo
+        command: ["ls", "-la"]
+      - id: remove_demo
+        command: ["rm", "-rf", "remove_demo_scratch"]
+
+scheduler:
+  capacity_provider: fixed
+  max_parallel: 2
+  poll_interval_s: 0.2
+  config:
+    slots: 2

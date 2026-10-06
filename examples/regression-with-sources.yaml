@@ -1,0 +1,37 @@
+name: mixed-source-example
+workspace: ./work
+run_root: ./runs
+
+# Illustrative only: replace URLs/revisions with real project locations.
+# Source count is unbounded and providers may be mixed in one context.
+sources:
+  - name: dut
+    provider: git
+    url: ssh://git.example.invalid/soc/dut.git
+    revision: main
+
+  - name: testbench
+    provider: svn
+    url: https://svn.example.invalid/repos/testbench/trunk
+    revision: "18291"
+
+  - name: firmware
+    provider: git
+    url: ssh://git.example.invalid/soc/firmware.git
+    revision: release/r1
+
+execution:
+  adapter: demo_linux
+  config:
+    tests:
+      - id: list_workspace
+        command: ["ls", "-la"]
+
+scheduler:
+  # The command must print the TOTAL concurrency currently allowed for this orchestrator.
+  capacity_provider: command
+  max_parallel: 8
+  poll_interval_s: 5.0
+  config:
+    command: ["python3", "-c", "print(3)"]
+    timeout_s: 10
