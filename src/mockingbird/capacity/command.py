@@ -8,7 +8,11 @@ from mockingbird.models import CheckResult
 
 
 class Provider(CapacityProvider):
-    """Runs a command whose stdout is the current total concurrency allowance."""
+    """Runs a command whose stdout is the current Mockingbird dispatch allowance.
+
+    For asynchronous external systems, the wrapper owns accounting for work
+    already handed off outside Mockingbird.
+    """
 
     def __init__(self, config: dict[str, Any]):
         command = config.get("command")

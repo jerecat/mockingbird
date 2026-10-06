@@ -14,12 +14,16 @@ def run_jobs(
     max_parallel: int,
     poll_interval_s: float,
 ) -> list[JobExecution]:
-    """Run jobs under a local hard cap and a polled external capacity limit.
+    """Run jobs under a hard local cap and the latest reported capacity.
 
-    ``capacity.available_slots()`` is intentionally generic. It returns the
-    maximum number of this orchestrator's jobs that may be concurrently
-    running *right now*. If the value drops below the number already running,
-    existing jobs are left alone and no new jobs are submitted.
+    At every scheduling decision, in-flight execute calls are reserved against
+    both max_parallel and capacity.available_slots(). If reported capacity drops
+    below the number already running, existing calls are left alone and no new
+    calls are dispatched.
+
+    For asynchronous external hand-off, the CapacityProvider must account for
+    work already handed to that external system on later samples. Core does not
+    track external scheduler job IDs.
     """
 
     pending = list(jobs)

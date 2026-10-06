@@ -89,8 +89,10 @@ the source result path, run ID, SHA-256, and selected Job IDs.
 
 ## AC-11: Integration must not require core modification
 
-External `module:Class` plugins are supported for execution/source/capacity.
-Project integration belongs in a project-owned package.
+Normal project execution integration is declarative and does not require Python.
+A project should first use the built-in command contract. External Python
+plugins remain an escape hatch for execution/source/capacity behavior that
+cannot be expressed by the small declarative boundary.
 
 ## AC-12: Connection checks are first-class
 
@@ -116,8 +118,9 @@ Core changes should introduce the minimum new knowledge and mechanism necessary.
 Do not move system-specific policy into core for convenience, and do not create a
 new abstraction solely for hypothetical future users.
 
-Prefer a project-owned adapter/provider/wrapper until repeated real integrations
-prove that a behavior is genuinely common.
+Prefer the declarative contract and a project-owned wrapper first. Use a custom
+adapter/provider only when the small boundary is genuinely insufficient, and
+promote common mechanisms only after repeated real integrations prove them.
 
 ## AC-15: Project evidence remains opaque
 
@@ -154,3 +157,51 @@ resolve, open, validate, or interpret them. An empty artifact list is valid.
 Other project-owned result information may be carried as optional opaque data,
 but must not become mandatory without repeated real integrations demonstrating
 a stable common need.
+
+
+## AC-17: Normal execution integration is declarative
+
+A user should normally integrate a runnable project by writing the execution
+contract in regression.yaml, not by implementing Mockingbird Python code.
+
+The normal boundary declares:
+
+    project command
+    finite local timeout
+    Job IDs and optional per-Job argv
+    result collection contract
+
+A string Job entry means: use the Job ID as the single argument to the project
+command. A mapping may override argv and timeout. Python ExecutionAdapter
+implementations remain supported only as an advanced escape hatch.
+
+## AC-18: One permitted Job means one project command
+
+For the declarative executor, one execute call starts exactly one project-owned
+command for one permitted Mockingbird Job.
+
+Mockingbird must not split that command into compile, submit, monitor, or other
+project-specific phases. The project command may perform those operations
+internally because that is the same boundary a human uses from a terminal.
+
+The local command wait is finite. execution.timeout_s is therefore mandatory for
+the declarative executor. On return or timeout, Mockingbird releases its local
+execution resources. Mockingbird does not create a resident daemon or detached
+monitor to follow externally handed-off work.
+
+## AC-19: Capacity is a hard dispatch gate
+
+At every scheduling decision, new dispatch is limited by:
+
+    allowed_running = min(max_parallel, available_slots())
+    new_dispatch = max(0, allowed_running - locally_in_flight)
+
+Mockingbird must not intentionally start another Job when new_dispatch is zero.
+
+If reported capacity falls below the number already running, existing executions
+are not killed. They may temporarily exceed the newly reported limit; new
+dispatch remains stopped until capacity permits it again.
+
+For asynchronous external hand-off, the CapacityProvider is responsible for
+including already submitted external work in later capacity samples before more
+Jobs are admitted. Core does not track external scheduler Job IDs.

@@ -53,3 +53,41 @@ scheduler:
     checks = run_doctor(load_definition(definition))
     assert doctor_failed(checks) is True
     assert any(item.status == "FAIL" and "not found" in item.message for item in checks)
+
+
+def test_doctor_accepts_declarative_command_contract_without_project_python(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    runner = tmp_path / "run.sh"
+    runner.write_text("#!/bin/sh\nexit 0\n")
+    runner.chmod(0o755)
+
+    definition = tmp_path / "regression.yaml"
+    definition.write_text(
+        """
+name: declarative-doctor
+sources: []
+execution:
+  command: ["./run.sh"]
+  timeout_s: 5
+  jobs: [smoke]
+  collect:
+    mode: exit-code
+scheduler:
+  capacity_provider: fixed
+  max_parallel: 1
+  poll_interval_s: 0.1
+  config: {slots: 1}
+"""
+    )
+
+    checks = run_doctor(load_definition(definition))
+
+    assert doctor_failed(checks) is False
+    assert any(
+        item.component == "execution"
+        and item.name == "plugin"
+        and item.message == "command"
+        and item.status == "PASS"
+        for item in checks
+    )
+    assert not (tmp_path / "work" / ".reg" / "context.json").exists()

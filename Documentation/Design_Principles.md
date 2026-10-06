@@ -200,3 +200,39 @@ For every proposed feature, ask these questions in order:
 ```
 
 This is the default decision rule for Mockingbird development.
+
+
+## Principle 8: Declare integration before programming it
+
+The normal project interface is regression.yaml plus project-owned commands.
+
+A project that can already be operated from the command line should not need
+Mockingbird Python code. Python plugins are an escape hatch for genuinely
+different mechanisms, not the first integration step.
+
+A useful rule is:
+
+> A user integrates a project by declaring the contract, not by programming
+> Mockingbird.
+
+## Principle 9: Execute one command, then get out of the way
+
+For a normal Job, Mockingbird should behave like a careful human at a terminal:
+
+    capacity permits
+          |
+          v
+    project command + argv
+          |
+          v
+    wait within declared timeout
+          |
+          v
+    command returns
+          |
+          v
+    release local execution resources
+
+Mockingbird does not turn compile, submission, monitoring, or simulator behavior
+into another orchestration framework. If a project command hands work to an
+external system, that external work remains project/system owned.

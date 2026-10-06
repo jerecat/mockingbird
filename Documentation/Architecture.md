@@ -85,6 +85,12 @@ SourceProvider
 CapacityProvider
 ```
 
+The normal user-facing execution path is declarative. `execution.command`,
+Jobs, timeout, and collection policy are normalized internally to the built-in
+command ExecutionAdapter. Users do not normally implement Python.
+
+Custom Python ExecutionAdapter remains an advanced escape hatch.
+
 ## ExecutionAdapter
 
 ```python
@@ -203,11 +209,13 @@ probe() -> list[CheckResult]
 available_slots() -> int
 ```
 
-The scheduler computes:
+The scheduler uses `available_slots()` as a hard dispatch gate together with
+`max_parallel`. Existing executions are not killed if capacity falls, but no
+new execution is admitted until the gate permits it again.
 
-```text
-effective_limit = min(max_parallel, available_slots())
-```
+For asynchronous external hand-off, the CapacityProvider must account for work
+already submitted outside Mockingbird in later samples. Core does not track
+external scheduler Job IDs.
 
 No queue/farm semantics enter core.
 
@@ -219,17 +227,15 @@ non-destructive provider/adapter probes. It does not prepare sources or run jobs
 The reusable `mockingbird.testing` conformance kit separately verifies implementation
 contracts for project-side pytest suites.
 
-## Project-owned extensions
+## Project integration and advanced extensions
 
-Projects should normally not edit mockingbird core. Install a project package and
-reference it using `module:Class`:
+Projects should normally not edit Mockingbird core or write a Python execution
+adapter. Start with the declarative command contract in
+`Execution_Contract.md`.
 
-```yaml
-execution:
-  adapter: my_soc_verification.regression:Adapter
-```
-
-The same external-plugin form is supported for source and capacity providers.
+If that boundary is genuinely insufficient, install a project package and
+reference a Python `module:Class` adapter. The same external-plugin form is
+available for source and capacity providers.
 
 ## Architecture enforcement
 
@@ -244,5 +250,5 @@ Tests enforce that:
 - doctor reports connection failures without preparing a context;
 - required architecture/ADR documents remain present.
 
-See `Architecture_Contract.md`, `Adapter_Implementation_Guide.md`, and
-`Adapter_Conformance_Testing.md`.
+See `Architecture_Contract.md`, `Execution_Contract.md`,
+`Adapter_Implementation_Guide.md`, and `Adapter_Conformance_Testing.md`.

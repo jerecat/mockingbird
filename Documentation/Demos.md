@@ -7,8 +7,9 @@ mockingbird doctor examples/sanity-linux.yaml
 mockingbird all examples/sanity-linux.yaml
 ```
 
-Purpose: prove connection probes, lifecycle, scheduler, per-job execution
-contexts, streamed logs, and canonical result flow on an ordinary Linux machine.
+Purpose: prove the no-project-Python declarative command path, connection probes,
+lifecycle, capacity gating, per-job execution contexts, streamed logs, and
+canonical result flow on an ordinary Linux machine.
 
 ## Explicit FAIL rerun
 
@@ -31,7 +32,7 @@ Purpose: mockingbird schedules groups of its own pytest tests through the concre
 `selftest` adapter. Core still sees only Jobs and canonical execution/result
 evidence.
 
-## External adapter demo
+## External adapter demo (advanced escape hatch)
 
 ```bash
 pip install -e examples/external_adapter

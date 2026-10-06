@@ -76,3 +76,52 @@ def test_scheduler_polls_until_capacity_becomes_available():
 
     assert [item.job_id for item in result] == ["one"]
     assert capacity.calls >= 3
+
+
+class MutableCapacity:
+    def __init__(self, value: int):
+        self.value = value
+
+    def available_slots(self) -> int:
+        return self.value
+
+
+def test_capacity_drop_to_zero_blocks_new_dispatch_without_killing_running_job():
+    jobs = [Job(id=f"job{i}") for i in range(3)]
+    capacity = MutableCapacity(1)
+    first_started = threading.Event()
+    release_first = threading.Event()
+    started: list[str] = []
+    result: list[JobExecution] = []
+
+    def execute(job: Job) -> JobExecution:
+        started.append(job.id)
+        if job.id == "job0":
+            first_started.set()
+            assert release_first.wait(timeout=1.0)
+        return JobExecution(job.id, _now(), _now(), 0.0)
+
+    def runner():
+        result.extend(
+            run_jobs(
+                jobs,
+                execute,
+                capacity,
+                max_parallel=8,
+                poll_interval_s=0.002,
+            )
+        )
+
+    thread = threading.Thread(target=runner)
+    thread.start()
+    assert first_started.wait(timeout=1.0)
+
+    capacity.value = 0
+    release_first.set()
+    time.sleep(0.03)
+    assert started == ["job0"]
+
+    capacity.value = 1
+    thread.join(timeout=1.0)
+    assert not thread.is_alive()
+    assert [item.job_id for item in result] == [job.id for job in jobs]

@@ -41,7 +41,12 @@ class ExecutionAdapter(ABC):
 
 
 class CapacityProvider(ABC):
-    """Reports the total concurrent-job allowance at this moment."""
+    """Reports current capacity available to Mockingbird dispatch.
+
+    Core reserves in-flight execute calls against this value. Providers for
+    asynchronous external systems must account for already handed-off work in
+    later samples; core deliberately does not track external scheduler job IDs.
+    """
 
     def probe(self) -> list[CheckResult]:
         try:

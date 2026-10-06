@@ -81,3 +81,56 @@ def test_prepare_rejects_duplicate_source_names(tmp_path, monkeypatch):
 
     with pytest.raises(ValueError, match="duplicate source name"):
         prepare(load_definition(definition_path))
+
+
+def test_execution_command_shorthand_normalizes_to_builtin_adapter(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    definition_path = tmp_path / "regression.yaml"
+    definition_path.write_text(
+        yaml.safe_dump(
+            {
+                "name": "command-contract",
+                "sources": [],
+                "execution": {
+                    "command": ["./run.sh"],
+                    "timeout_s": 60,
+                    "jobs": ["a"],
+                    "collect": {"mode": "exit-code"},
+                },
+                "scheduler": {
+                    "capacity_provider": "fixed",
+                    "max_parallel": 1,
+                    "config": {"slots": 1},
+                },
+            }
+        )
+    )
+
+    context = prepare(load_definition(definition_path))
+
+    assert context["execution"]["adapter"] == "command"
+    assert context["execution"]["config"]["command"] == ["./run.sh"]
+    assert context["execution"]["config"]["jobs"] == ["a"]
+
+
+def test_execution_rejects_ambiguous_adapter_and_top_level_command(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    definition_path = tmp_path / "regression.yaml"
+    definition_path.write_text(
+        yaml.safe_dump(
+            {
+                "sources": [],
+                "execution": {
+                    "adapter": "demo_linux",
+                    "command": ["./run.sh"],
+                },
+                "scheduler": {"capacity_provider": "fixed"},
+            }
+        )
+    )
+
+    import pytest
+    from mockingbird.context import validate_definition
+
+    with pytest.raises(ValueError, match="both adapter"):
+        validate_definition(load_definition(definition_path))

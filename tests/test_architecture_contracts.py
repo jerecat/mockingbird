@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from mockingbird.adapters.command import Adapter as CommandAdapter
 from mockingbird.adapters.demo_linux import Adapter as DemoLinuxAdapter
 from mockingbird.adapters.selftest import Adapter as SelfTestAdapter
 from mockingbird.capacity.command import Provider as CommandCapacityProvider
@@ -16,6 +17,7 @@ from mockingbird.sources.svn import Provider as SvnSourceProvider
 
 
 def test_builtin_plugins_implement_only_the_declared_boundaries():
+    assert issubclass(CommandAdapter, ExecutionAdapter)
     assert issubclass(DemoLinuxAdapter, ExecutionAdapter)
     assert issubclass(SelfTestAdapter, ExecutionAdapter)
     assert issubclass(GitSourceProvider, SourceProvider)
@@ -69,6 +71,7 @@ def test_external_source_and_capacity_plugins_can_be_loaded_without_editing_core
 
 
 def test_builtin_short_names_still_load_through_contract_checked_loader():
+    assert isinstance(load_adapter("command"), ExecutionAdapter)
     assert isinstance(load_adapter("demo_linux"), ExecutionAdapter)
     assert isinstance(load_source_provider("git"), SourceProvider)
     assert isinstance(load_source_provider("svn"), SourceProvider)
@@ -85,6 +88,7 @@ def test_architecture_documentation_and_adrs_are_part_of_the_repository_contract
         root / "Documentation" / "Adapter_Conformance_Testing.md",
         root / "Documentation" / "Getting_Started.md",
         root / "Documentation" / "Integration_Guide.md",
+        root / "Documentation" / "Execution_Contract.md",
         root / "Documentation" / "Demos.md",
         *[root / "Documentation" / "ADR" / name for name in (
             "0001-context-plan-run-result.md",
@@ -93,6 +97,7 @@ def test_architecture_documentation_and_adrs_are_part_of_the_repository_contract
             "0004-explicit-failed-from.md",
             "0005-execution-context-and-process-io.md",
             "0006-doctor-and-conformance-kit.md",
+            "0007-declarative-execution-and-bounded-handoff.md",
         )],
     ]
     missing = [str(path.relative_to(root)) for path in required if not path.is_file()]

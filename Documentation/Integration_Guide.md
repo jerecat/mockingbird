@@ -1,161 +1,138 @@
 # Integration Guide
 
-## What a project normally owns
+The normal Mockingbird integration is a contract, not a Python implementation.
 
-| Area | Usually needed? | Owner |
-|---|---:|---|
-| regression definition | yes | project `regression.yaml` |
-| execution behavior | yes | project `ExecutionAdapter` package |
-| adapter tests | yes | project pytest suite using `mockingbird.testing` |
-| source acquisition | usually no | built-in Git/SVN or custom SourceProvider |
-| capacity query | sometimes | command provider or custom CapacityProvider |
+## 1. Start from the command a human already runs
 
-Do not edit lifecycle, scheduler, selection, or canonical result code merely to
-connect a project.
+Suppose the project already supports:
 
-## 1. Define sources and scheduling policy
+    ./run.sh test_a
+    ./run.sh test_b
 
-```yaml
-name: soc-nightly
+Describe that directly:
 
-sources:
-  - name: dut
-    provider: git
-    url: ssh://server/dut.git
-    revision: main
-  - name: testbench
-    provider: svn
-    url: https://server/svn/tb/trunk
-    revision: HEAD
+    name: soc-nightly
 
-execution:
-  adapter: my_soc_regression.adapter:Adapter
-  config:
-    profile: nightly
+    sources: []
 
-scheduler:
-  capacity_provider: command
-  max_parallel: 8
-  poll_interval_s: 5.0
-  config:
-    command: [my-capacity-wrapper]
-```
+    execution:
+      command: ["./run.sh"]
+      timeout_s: 900
+      jobs:
+        - test_a
+        - test_b
+      collect:
+        mode: exit-code
 
-## 2. Implement the project adapter
+    scheduler:
+      capacity_provider: fixed
+      max_parallel: 4
+      poll_interval_s: 1
+      config:
+        slots: 4
 
-```python
-from mockingbird.contracts import ExecutionAdapter
-from mockingbird.models import CheckResult, Job, JobExecution, TestResult
-from mockingbird.adapter_utils import execution_path_refs, result_from_execution, run_process
+A string Job entry means command + Job ID. Use a mapping only when argv differs:
 
-class Adapter(ExecutionAdapter):
-    def probe(self, context):
-        return [CheckResult("execution", "tool", "PASS", "tool reachable")]
+    jobs:
+      - id: pcie_dma_write
+        args: ["--test", "dma_write"]
+      - id: compile_heavy
+        args: ["--test", "compile_heavy"]
+        timeout_s: 1800
 
-    def setup(self, context):
-        ...
+## 2. Choose result collection explicitly
 
-    def plan(self, context):
-        return [Job(id="pcie/dma/write/seed-001", payload={...})]
+For a synchronous command whose exit status is the test result:
 
-    def execute(self, context, job, execution):
-        process = run_process(
-            ["./run_test.sh", job.id],
-            execution,
-            timeout_s=3600,
-        )
-        return JobExecution(
-            job_id=job.id,
-            started_at="...",
-            finished_at="...",
-            duration_s=process.duration_s,
-            observation=process.to_observation(),
-        )
+    collect:
+      mode: exit-code
 
-    def collect(self, context, executions):
-        results = []
-        for execution in executions:
-            rc = int(execution.observation["returncode"])  # project policy
-            results.append(
-                result_from_execution(
-                    execution,
-                    "PASS" if rc == 0 else "FAIL",
-                    artifacts=execution_path_refs(execution, "stdout", "stderr"),
-                )
-            )
-        return results
-```
+For compile + submit + return workflows:
 
-See `Adapter_Implementation_Guide.md` for stdout/stderr, timeout, Job identity,
-and result-status guidance.
+    collect:
+      command: ["./collect.sh"]
+      timeout_s: 60
 
-## 3. Add project-side conformance tests
+Mockingbird appends the Job ID:
 
-```python
-from mockingbird.testing import assert_conformance, check_execution_adapter
+    ./collect.sh pcie_dma_write
 
+The collector prints one JSON object to stdout:
 
-def test_mockingbird_adapter(tmp_path, project_context):
-    checks = check_execution_adapter(MyAdapter(), project_context, tmp_path)
-    assert_conformance(checks)
-```
+    {"status":"PASS","artifacts":["artifact://pcie_dma_write/sim.log"]}
 
-This is expected integration work, not optional polish. Run it before the adapter
-is accepted into a nightly regression environment.
+The same collector is reused for every Job. Project code may use a default rule
+plus a small exception map internally; Mockingbird does not know that policy.
 
-## 4. Run doctor on the actual machine
+## 3. Capacity is independent of execution
 
-```bash
-mockingbird doctor regression.yaml
-```
+Local example:
 
-This catches missing tools, repository access problems, adapter probe failures,
-and capacity query failures before source materialization or regression start.
+    scheduler:
+      capacity_provider: fixed
+      max_parallel: 8
+      config:
+        slots: 8
 
-## 5. Validate the plan
+Compute-center example:
 
-```bash
-mockingbird prepare regression.yaml
-mockingbird setup regression.yaml
-mockingbird plan regression.yaml
-mockingbird dry-run regression.yaml
-```
+    scheduler:
+      capacity_provider: command
+      max_parallel: 20
+      poll_interval_s: 5
+      config:
+        command: ["./available_slots.sh"]
 
-Check that Job IDs are stable and that the chosen Job granularity matches the
-rerun granularity the team wants.
+The capacity wrapper prints one non-negative integer.
 
-## 6. Capacity integration
+Mockingbird never intentionally dispatches above the reported gate. For
+submit-and-return systems, the wrapper must account for already submitted
+external work before more capacity is reported.
 
-Prefer the command provider first. The wrapper prints one non-negative integer:
+## 4. Compute-center lifecycle
 
-```text
-3
-```
+The normal asynchronous sequence is:
 
-Only write a custom CapacityProvider if that boundary is insufficient.
+    mb doctor regression.yaml
+    mb prepare regression.yaml
+    mb setup regression.yaml
+    mb plan regression.yaml
+    mb dry-run regression.yaml
+    mb run regression.yaml
 
-## 7. Source integration
+After the project/system says results are ready:
 
-Built-in Git/SVN can be mixed in arbitrary count. Implement a custom
-SourceProvider only for a materially different source materialization mechanism.
+    mb collect regression.yaml --run-dir runs/<chosen-run>
 
-## Integration acceptance checklist
+Mockingbird does not remain resident to poll the scheduler. Do not use mb all
+unless collection is valid immediately after run.sh returns.
 
-```text
-[ ] mockingbird doctor passes on a representative execution machine
-[ ] project adapter conformance pytest passes
-[ ] setup can be repeated safely
-[ ] plan returns stable unique Job IDs
-[ ] Job granularity matches desired rerun granularity
-[ ] Job payloads are JSON serializable
-[ ] large stdout/stderr goes to files, not Python memory/JSON
-[ ] timeout/process-group behavior is defined
-[ ] shell=True is not used; shell policy lives in project wrapper scripts
-[ ] collect returns one matching result per executed Job
-[ ] collect returns canonical PASS/FAIL/ERROR/SKIP status
-[ ] collect returns needed artifact references as opaque strings
-[ ] collect distinguishes FAIL from infrastructure ERROR
-[ ] secrets are absent from context/result/check messages
-[ ] source revisions needed for reproduction are frozen by prepare
-[ ] dry-run clearly shows intended selection before execution
-```
+## 5. Source integration
+
+Built-in Git and SVN providers may be mixed in any count. Use a custom
+SourceProvider only for a materially different materialization mechanism.
+
+## 6. Advanced Python escape hatch
+
+If the command contract cannot express a real integration requirement, an
+external Python ExecutionAdapter is still supported:
+
+    execution:
+      adapter: my_soc_regression.adapter:Adapter
+      config:
+        profile: nightly
+
+That path is deliberately advanced. See Adapter_Implementation_Guide.md and
+Adapter_Conformance_Testing.md.
+
+## Acceptance checklist
+
+    [ ] doctor passes on a representative execution machine
+    [ ] Job IDs are stable and unique
+    [ ] timeout_s bounds every declarative project command
+    [ ] one permitted Job starts one project command
+    [ ] capacity never admits work above the declared gate
+    [ ] async capacity query accounts for already handed-off external work
+    [ ] collector returns exactly one canonical result per executed Job
+    [ ] large logs remain files
+    [ ] no secret is written into context/result/check messages

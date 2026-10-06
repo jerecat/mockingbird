@@ -58,15 +58,36 @@ def _validate_sources(sources: list[dict[str, Any]]) -> None:
         names.add(name)
 
 
+def _normalize_execution(execution: Any) -> dict[str, Any]:
+    if not isinstance(execution, dict):
+        raise ValueError("execution must be a mapping")
+
+    if execution.get("adapter"):
+        if "command" in execution:
+            raise ValueError(
+                "execution cannot define both adapter and top-level command; "
+                "put adapter-specific values under execution.config"
+            )
+        return dict(execution)
+
+    if "command" not in execution:
+        raise ValueError("execution requires either command or adapter")
+
+    # Declarative command execution is the normal path. Internally it still
+    # crosses the same execution boundary as an advanced Python adapter.
+    return {
+        "adapter": "command",
+        "config": dict(execution),
+    }
+
+
 def validate_definition(defn: dict[str, Any]) -> None:
     sources = list(defn.get("sources", []))
     if not all(isinstance(item, dict) for item in sources):
         raise ValueError("sources must be a list of mappings")
     _validate_sources(sources)
 
-    execution = defn.get("execution")
-    if not isinstance(execution, dict) or not execution.get("adapter"):
-        raise ValueError("execution.adapter is required")
+    _normalize_execution(defn.get("execution"))
 
     scheduler = defn.get("scheduler")
     if not isinstance(scheduler, dict) or not scheduler.get("capacity_provider"):
@@ -101,7 +122,7 @@ def provisional_context(defn: dict[str, Any]) -> dict[str, Any]:
             "run_root": str(run_root),
         },
         "sources": [dict(item) for item in defn.get("sources", [])],
-        "execution": dict(defn["execution"]),
+        "execution": _normalize_execution(defn["execution"]),
         "scheduler": scheduler,
     }
 
@@ -136,7 +157,7 @@ def prepare(defn: dict[str, Any]) -> dict[str, Any]:
             }
         )
 
-    execution = dict(defn["execution"])
+    execution = _normalize_execution(defn["execution"])
     scheduler = dict(defn["scheduler"])
     scheduler["max_parallel"] = int(scheduler.get("max_parallel", 1))
     scheduler["poll_interval_s"] = float(scheduler.get("poll_interval_s", 1.0))

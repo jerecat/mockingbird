@@ -3,18 +3,17 @@ workspace: ./work
 run_root: ./runs
 sources: []
 
+# Normal integration path: declare the command contract only.
 execution:
-  adapter: demo_linux
-  config:
-    tests:
-      - id: pwd
-        command: ["pwd"]
-      - id: list_directory
-        command: ["ls", "-la"]
-      - id: make_directory
-        command: ["mkdir", "-p", "sanity_mkdir"]
-      - id: remove_directory
-        command: ["rm", "-rf", "sanity_remove"]
+  command: ["./examples/sanity-run.sh"]
+  timeout_s: 30
+  jobs:
+    - pwd
+    - list_directory
+    - make_directory
+    - remove_directory
+  collect:
+    mode: exit-code
 
 scheduler:
   capacity_provider: fixed

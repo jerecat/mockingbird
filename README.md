@@ -1,6 +1,6 @@
 # Mockingbird
 
-A deliberately small, adapter-driven regression orchestrator prototype.
+A deliberately small, contract-driven regression orchestrator prototype.
 
 Current prototype version: **0.5.0**.
 
@@ -49,6 +49,29 @@ The evidence model remains:
 ```text
 Context -> Plan -> Run -> Result
 ```
+
+
+## Normal project integration: write the contract
+
+Projects that already have a command-line entry point should not need
+Mockingbird Python code.
+
+```yaml
+execution:
+  command: ["./run.sh"]
+  timeout_s: 600
+  jobs:
+    - test_a
+    - test_b
+  collect:
+    mode: exit-code
+```
+
+A string Job runs as `./run.sh <job-id>`. A mapping can override argv and
+timeout. For submit-and-return systems, configure one shared collector command
+instead of exit-code collection.
+
+See `Documentation/Execution_Contract.md`.
 
 ## Key architecture rules
 
@@ -178,9 +201,10 @@ mockingbird run regression.yaml --failed-from runs/<explicit-run>/result.json
 
 There is intentionally no implicit "latest failed" source.
 
-## Adapter process execution
+## Advanced Python adapter process execution
 
-For normal Linux subprocess adapters, use:
+Normal users should use the declarative execution contract above. For a custom
+Python adapter that genuinely needs direct subprocess control, use:
 
 ```python
 from mockingbird.adapter_utils import run_process
@@ -217,7 +241,7 @@ Runtime/machine health:
 mockingbird doctor regression.yaml
 ```
 
-Implementation contract in project pytest:
+Custom Python plugin implementation contract in project pytest:
 
 ```python
 from mockingbird.testing import assert_conformance, check_execution_adapter
@@ -228,7 +252,10 @@ assert_conformance(checks)
 
 Equivalent helpers exist for SourceProvider and CapacityProvider.
 
-## Extension contracts
+## Advanced extension contracts
+
+The declarative command contract is the normal execution path. Python extension
+contracts remain available as escape hatches:
 
 ```python
 ExecutionAdapter:
@@ -259,6 +286,7 @@ execution:
 Start here:
 
 - `Documentation/Architecture.md`
+- `Documentation/Execution_Contract.md`
 - `Documentation/Architecture_Contract.md`
 - `Documentation/Adapter_Implementation_Guide.md`
 - `Documentation/Adapter_Conformance_Testing.md`

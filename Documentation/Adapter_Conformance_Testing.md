@@ -2,6 +2,12 @@
 
 Integration should be testable independently of a nightly regression.
 
+For the normal declarative command path, Mockingbird owns the Python
+implementation and repository tests cover it. Project users normally need only
+`mockingbird doctor` plus their own command/collector tests.
+
+The project-side pytest conformance kit below is for custom Python plugins.
+
 ## Layer 1: `mockingbird doctor`
 
 ```bash
@@ -35,7 +41,7 @@ Probe rules:
 
 ## Layer 2: project-side pytest conformance
 
-A project-owned adapter package should include tests similar to:
+A custom project-owned adapter package should include tests similar to:
 
 ```python
 from mockingbird.testing import assert_conformance, check_execution_adapter

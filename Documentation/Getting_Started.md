@@ -51,8 +51,9 @@ or:
 make sanity
 ```
 
-Expected result is four PASS Jobs. `pwd`, `ls`, `mkdir`, and `rm` exist only in
-the demo adapter/configuration; core does not understand them.
+Expected result is four PASS Jobs. The example uses a declarative execution
+contract and `examples/sanity-run.sh`; core does not understand the commands
+inside that project-owned wrapper.
 
 ## 5. Inspect evidence
 
@@ -97,11 +98,21 @@ make self-demo
 
 ## 8. Integrate a real project
 
-Read in this order:
+Start with the declarative contract. No project Python is required:
 
-1. `Adapter_Implementation_Guide.md`
-2. `Adapter_Conformance_Testing.md`
-3. `Integration_Guide.md`
+    execution:
+      command: ["./run.sh"]
+      timeout_s: 600
+      jobs:
+        - test_a
+        - test_b
+      collect:
+        mode: exit-code
 
-The normal goal is: add a project-owned adapter package and YAML, not modify
-mockingbird core.
+For a submit-and-return flow, replace exit-code collection with one shared
+project collector command.
+
+Read `Execution_Contract.md` first, then `Integration_Guide.md`.
+
+Only read the adapter implementation/conformance guides when the declarative
+boundary is genuinely insufficient and a custom Python adapter is needed.

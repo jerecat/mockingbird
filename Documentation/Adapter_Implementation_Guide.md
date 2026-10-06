@@ -1,7 +1,11 @@
 # Adapter Implementation Guide
 
-This is the normative implementation guidance for project-owned
+This is the advanced implementation guidance for project-owned
 `ExecutionAdapter` code.
+
+Most users should not write an adapter. Start with `Execution_Contract.md` and
+the built-in declarative command path. Use this guide only when that small
+contract is genuinely insufficient.
 
 ## 1. Choose the Job boundary first
 
@@ -165,6 +169,34 @@ For VCS, board tests, or another system, keep exactly the same envelope and
 replace only the project-owned interpretation/artifact discovery. The helpers do
 not parse logs, discover waveforms, or decide PASS/FAIL; they only remove
 repetitive Mockingbird plumbing.
+
+
+### One common collector with small exceptions
+
+Hundreds or thousands of Job IDs should not imply hundreds of collector
+implementations. Prefer one common rule and register only genuine exceptions in
+project code:
+
+    COLLECTOR_EXCEPTIONS = {
+        "pcie/special-reset": reset_collector,
+    }
+
+    def collect_one(execution):
+        collector = COLLECTOR_EXCEPTIONS.get(
+            execution.job_id,
+            default_collector,
+        )
+        return collector(execution)
+
+    def collect(self, context, executions):
+        return [collect_one(item) for item in executions]
+
+Exact IDs are only one project-side option. A project may route by its own
+payload, metadata, naming convention, or test group.
+
+Mockingbird does not provide or interpret an exception registry. Keep routing
+policy in the project unless repeated real integrations prove a common helper is
+worth adding.
 
 ## 3. Process execution guidance
 
