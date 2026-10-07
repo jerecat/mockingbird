@@ -26,6 +26,25 @@ Do not judge usability from unit tests or implementation code alone.
 - Inspect stdout, stderr, exit code, and the next command together. Parse JSON
   modes with a JSON parser. Check unequal Job ID lengths and multiline reasons.
 
+## Review the first-reader explanation
+
+Read the introductory guide without relying on implementation knowledge. Before
+running anything, write down the exact argv and cwd for run and collect, clone
+destination, MB-owned paths, project-owned results, and run/Job identity linkage.
+If these answers require searching contracts or ADRs, improve the entry guide.
+
+Start examples with a familiar shell command, then one explicit Job, then its
+collector, and only then defaults. Explain each new field when it becomes needed.
+Exercise an existing worktree with `sources: []` as well as source acquisition.
+Verify that choosing a script path does not imply `cd`, and distinguish cwd saved
+at prepare time from a later CLI invocation. Explain when YAML edits require
+prepare/setup/plan and why source edits are not snapshotted.
+
+Execute the guide in an isolated directory and compare the evidence with those
+predictions. Passing a preconfigured tutorial is not proof that a new user can
+connect their own scripts. Record discovered explanation gaps and their causes;
+keep the preventive checks in this skill rather than accumulating incident prose.
+
 ## Apply these rules
 
 1. Answer: what happened, what needs attention, and what the user can do next.
