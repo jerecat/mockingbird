@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -11,16 +12,18 @@ from mockingbird.contracts import SourceProvider
 from mockingbird.models import CheckResult
 
 
-def _run(args: list[str], *, cwd: Path | None = None, env=None) -> str:
+def _run(args: list[str], *, cwd: Path | None = None, env=None, stream=False) -> str:
     completed = subprocess.run(
         args,
         cwd=cwd,
         env=env,
         check=True,
         text=True,
-        capture_output=True,
+        # Keep machine-readable CLI stdout clean, even for Git stdout.
+        stdout=sys.stderr if stream else subprocess.PIPE,
+        stderr=None if stream else subprocess.PIPE,
     )
-    return completed.stdout.strip()
+    return "" if stream else completed.stdout.strip()
 
 
 def _try_run(args: list[str], *, cwd: Path) -> str | None:
@@ -79,9 +82,9 @@ class Provider(SourceProvider):
             with tempfile.TemporaryDirectory(prefix=f".{destination.name}-clone-",
                                              dir=destination.parent) as staging:
                 checkout = Path(staging) / "checkout"
-                _run(["git", "clone", "--no-checkout", url, str(checkout)])
+                _run(["git", "clone", "--progress", "--no-checkout", url, str(checkout)], stream=True)
                 resolved = _resolve_revision(checkout, revision)
-                _run(["git", "checkout", "--detach", resolved], cwd=checkout)
+                _run(["git", "checkout", "--progress", "--detach", resolved], cwd=checkout, stream=True)
                 # Rename on the same filesystem. Never replace a nonempty tree.
                 checkout.rename(destination)
 

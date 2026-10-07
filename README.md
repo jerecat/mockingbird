@@ -183,6 +183,9 @@ Git repositories and mock simulator output; they do not require remote servers,
 a simulator, or simulator licences. This is not a filesystem sandbox: Python,
 libraries, system commands and Git configuration may be read outside the clone.
 
+Git clone and checkout output is shown live on stderr during prepare, including
+Git progress. No flag is required; `prepare --json` keeps stdout as JSON.
+
 ## Workspace/run layout
 
 Relative paths are based on the directory where `mockingbird` is invoked.
