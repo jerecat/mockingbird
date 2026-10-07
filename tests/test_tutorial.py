@@ -18,21 +18,31 @@ def cli(root, *args, answers=None):
                           input=answers, text=True, capture_output=True, timeout=20)
 
 
-@pytest.mark.parametrize("automatic", [True, False])
-def test_tutorial_complete_and_cleanup_is_only_guidance(tmp_path, automatic):
+@pytest.mark.parametrize("automatic, advanced", [(True, False), (False, False), (True, True)])
+def test_tutorial_complete_and_cleanup_is_only_guidance(tmp_path, automatic, advanced):
     target = tmp_path / "exercise with spaces"
-    result = cli(tmp_path, "--directory", target, *(["--yes"] if automatic else []),
+    result = cli(tmp_path, "--directory", target, *(["--yes"] if automatic else []), *(["--advanced"] if advanced else []),
                  answers=None if automatic else "\n" * 14)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "Tutorial complete." in result.stdout
-    assert "expected 2" in result.stdout and "expected 1" in result.stdout
+    assert "expected 2" in result.stdout
+    assert result.stdout.count("$ mb collect ") == 2
+    assert "Collect once more" not in result.stdout
+    if not advanced:
+        assert "--pending-only" in result.stdout
+        assert "test_collect_error" not in result.stdout
+        assert "expected 1" not in result.stdout
     assert shlex.join(["rm", "-rf", "--", str(target)]) in result.stdout
     assert target.is_dir() and (target / "GUIDE.md").is_file()
     assert not (tmp_path / "work").exists() and not (tmp_path / "runs").exists()
     run, = (target / "runs/sample-collector").iterdir()
     summary = json.loads((run / "result.json").read_text())["summary"]
-    assert summary == {"total": 8, "pass": 5, "fail": 1, "error": 1, "skip": 1,
+    expected = {"total": 8, "pass": 5, "fail": 1, "error": 1, "skip": 1,
                        "pending": 0, "uncollected": 0, "collection_error": 0}
+    if not advanced:
+        expected = {"total": 2, "pass": 2, "fail": 0, "error": 0, "skip": 0,
+                    "pending": 0, "uncollected": 0, "collection_error": 0}
+    assert summary == expected
     project = target / "work/sample-results" / run.name
     for job in project.iterdir():
         calls = job / "collector_calls.txt"

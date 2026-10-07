@@ -13,6 +13,8 @@ import subprocess
 import sys
 import tempfile
 
+import yaml
+
 
 EXAMPLES = ("sample-collector.yaml", "sample_run.py", "sample_collect.py", "sample_finish.py")
 DEFINITION = "examples/sample-collector.yaml"
@@ -58,10 +60,12 @@ def _closing(root: Path, complete: bool) -> None:
     print("Nothing is deleted automatically.")
 
 
-def run_tutorial(directory: str | None = None, automatic: bool = False) -> None:
+def run_tutorial(directory: str | None = None, automatic: bool = False, advanced: bool = False) -> None:
     source = _examples()
     print("Mockingbird guided tutorial")
-    print("Try prepare, setup, plan, selection, run, status, collect and recovery.")
+    print("Advanced: includes failing verdicts and collector faults." if advanced else
+          "Basics: run two Jobs, collect what is ready, then collect the remaining result.")
+    count = "eight" if advanced else "two"
     print("The sample creates text artifacts; it does not run a simulator or clone sources.")
     print("All exercise files will live in a NEW directory. Existing directories are refused.")
     if directory:
@@ -86,10 +90,15 @@ def run_tutorial(directory: str | None = None, automatic: bool = False) -> None:
         (root / "examples").mkdir()
         for name in EXAMPLES:
             shutil.copyfile(source / name, root / "examples" / name)
-        (root / "GUIDE.md").write_text(_guide())
+        if not advanced:
+            definition = root / DEFINITION
+            data = yaml.safe_load(definition.read_text())
+            data["execution"]["jobs"] = ["test_pass", "test_pending"]
+            definition.write_text(yaml.safe_dump(data, sort_keys=False))
+        (root / "GUIDE.md").write_text(_guide(advanced))
         print(f"\nCreated: {root}")
         print(f"Commands run with cwd: {root}")
-        print("Open examples/sample-collector.yaml to inspect the eight Jobs.")
+        print(f"Open examples/sample-collector.yaml to inspect the {count} Jobs.")
         print("sources: [] uses existing scripts. workspace holds preparation metadata;")
         print("run_root holds run records. The scripts choose their own artifact directory.")
         print("Each step below prints the ordinary command you can also run yourself.")
@@ -122,10 +131,10 @@ def run_tutorial(directory: str | None = None, automatic: bool = False) -> None:
             ("1. Check connections", "Doctor checks configuration, executable availability and capacity without starting Jobs.\nThe summary groups these checks; use doctor --details if you need individual diagnostics.", ["doctor", DEFINITION]),
             ("2. Prepare", "Save context in work/sample-collector/.reg/. No source clone is needed.", ["prepare", DEFINITION]),
             ("3. Setup", "Prepare the adapter environment. This sample needs no project build.", ["setup", DEFINITION]),
-            ("4. Plan", "Resolve defaults and validate eight complete Job contracts; nothing executes yet.", ["plan", DEFINITION]),
-            ("5. Preview a selection", "Select two Jobs without executing them. The next run will use all eight.",
+            ("4. Plan", f"Resolve defaults and validate {count} complete Job contracts; nothing executes yet.", ["plan", DEFINITION]),
+            ("5. Preview a selection", f"Preview test_pass and test_pending without executing them. The next run uses all {count} Jobs.",
              ["dry-run", DEFINITION, "--test", "test_pass", "--test", "test_pending"]),
-            ("6. Run", "Execute eight commands serially. Exit zero records command completion, not a PASS verdict.", ["run", DEFINITION]),
+            ("6. Run", f"Execute {count} commands serially. test_pending simulates external work that is still running.\nCommand completion does not mean that external work has finished.", ["run", DEFINITION]),
             ("7. Status before collection", "Execution records exist; no results have been collected. Status reads saved observations, not liveness.", ["status", DEFINITION]),
         ]
         for title, explanation, args in stages:
@@ -134,46 +143,74 @@ def run_tutorial(directory: str | None = None, automatic: bool = False) -> None:
         run_dir = Path(json.loads((root / "work/sample-collector/.reg/last_run.json").read_text())["run_dir"])
         collect = ["collect", DEFINITION, "--run-dir", str(run_dir)]
         status = ["status", DEFINITION, "--run-dir", str(run_dir), "--details"]
-        if not step("8. Collect", "Expected: PASS 2, FAIL 1, ERROR 1, SKIP 1, PENDING 1, collection errors 2.\n"
-                    "No-check contributes a PASS without inspecting evidence. Exit 2 means unresolved results.", collect, 2):
+        first = ("Expected: PASS 2, FAIL 1, ERROR 1, SKIP 1, PENDING 1, collection errors 2.\n"
+                 "No-check contributes a PASS without inspecting evidence. Exit 2 means unresolved results."
+                 if advanced else
+                 "test_pass is ready; test_pending is not finished yet.\n"
+                 "Collect saves the ready result and leaves the other PENDING (exit 2).")
+        if not step("8. Collect 1/2: get the results available now", first, collect, 2):
             return
-        _check_results(run_dir, final=False)
-        if not step("9. Inspect reasons", "Final ERROR is a judgement. COLLECTION_ERROR means collection failed and can be retried.", status):
+        _check_results(run_dir, final=False, advanced=advanced)
+        if advanced and not step("Inspect collector failures", "Final ERROR is a judgement. COLLECTION_ERROR means collection failed and can be retried.", status):
             return
-        if not step("10. Simulate external completion", "This project helper creates the pending Job's done marker and removes collector fault markers.\n"
-                    "The done file is a sample convention, not an MB contract. No Jobs are rerun.",
-                    ["examples/sample_finish.py", run_dir.name], helper=True):
+        helper = ["examples/sample_finish.py", run_dir.name]
+        if not advanced:
+            helper.append("--pending-only")
+        explanation = ("The sample helper marks the pending Job complete and removes collector fault markers."
+                       if advanced else
+                       "Imagine the external simulation has now finished. This SAMPLE helper creates its done file.\n"
+                       "It does not run a simulation or repair MB. In real use, your external system finishes the work.")
+        if not step("9. Make the remaining sample result available", explanation +
+                    "\nThe done file is this sample's convention, not an MB requirement.", helper, helper=True):
             return
-        if not step("11. Collect unresolved Jobs", "Only the three unresolved Jobs are recollected. Expected: PASS 5, FAIL 1, ERROR 1, SKIP 1.\n"
-                    "Exit 1 is intentional: all results are final, but the sample contains FAIL/ERROR verdicts.", collect, 1):
+        second = ("Only the three unresolved Jobs are collected. Final counts: PASS 5, FAIL 1, ERROR 1, SKIP 1.\n"
+                  "Exit 1 is intentional because final FAIL/ERROR verdicts remain."
+                  if advanced else
+                  "Collect the SAME run again: only test_pending needs a result.\n"
+                  "test_pass stays final; neither Job is executed again. Expected: PASS 2 (exit 0).")
+        if not step("10. Collect 2/2: get the remaining result", second, collect, 1 if advanced else 0):
             return
-        _check_results(run_dir, final=True)
-        if not step("12. Inspect final results", "All eight results are final. Artifact paths are in result.json; files stay where the project wrote them.", status):
+        _check_results(run_dir, final=True, advanced=advanced)
+        if not step("11. Check that all results are final", f"All {count} results should now be final. No more collect is needed for this run.", status):
             return
-        if not step("13. Collect once more", "Final results are retained. No collectors should run again; collector_calls.txt in each project directory records calls.", collect, 1):
-            return
-        _check_results(run_dir, final=True)
+        print("\nRun executes commands. Collect obtains results. If results are pending, collect the same run later.")
+        if not advanced:
+            print("Optional next exercise: mb tutorial --advanced (in a new directory).")
         complete = True
     finally:
         _closing(root, complete)
 
 
-def _check_results(run_dir: Path, *, final: bool) -> None:
+def _check_results(run_dir: Path, *, final: bool, advanced: bool = False) -> None:
     expected = {"total": 8, "pass": 5 if final else 2, "fail": 1, "error": 1,
                 "skip": 1, "pending": 0 if final else 1, "uncollected": 0,
                 "collection_error": 0 if final else 2}
+    if not advanced:
+        expected = {"total": 2, "pass": 2 if final else 1, "fail": 0, "error": 0,
+                    "skip": 0, "pending": 0 if final else 1, "uncollected": 0, "collection_error": 0}
     result = json.loads((run_dir / "result.json").read_text())
     if result["summary"] != expected:
         raise RuntimeError(f"tutorial results differ from the expected sample: {result['summary']}; "
                            "inspect the kept files before continuing")
 
 
-def _guide() -> str:
-    return """# Guided tutorial: manual continuation
+def _guide(advanced: bool = False) -> str:
+    mode = "Advanced" if advanced else "Basic"
+    first = ("PASS 2, FAIL 1, ERROR 1, SKIP 1, PENDING 1 and two collection errors."
+             if advanced else "test_pass is PASS; test_pending is still PENDING.")
+    helper = "" if advanced else " --pending-only"
+    completion = ("The sample helper marks the pending Job complete and removes collector fault markers."
+                  if advanced else "The sample helper creates test_pending's done file, standing in for external work finishing.")
+    last = ("Only the three unresolved Jobs are collected. Final counts: PASS 5, FAIL 1, ERROR 1, SKIP 1.\n"
+            "Exit 1 is intentional because FAIL/ERROR verdicts remain."
+            if advanced else "Only test_pending is collected. test_pass stays final. Both Jobs are now PASS (exit 0).")
+    return f"""# {mode} guided tutorial: manual continuation
 
-Run these commands from this directory with the installed `mb` command.
-This directory contains copies of the repository's mock simulation examples.
-No simulator or external Git repository is used. Every wave.fsdb is mock text.
+Run commands from this exercise directory with the installed `mb` command.
+The examples create text artifacts, not real simulations. No external repository
+is cloned. The basic exercise has two Jobs; --advanced uses all eight sample Jobs.
+
+## Prepare and run
 
 ```sh
 mb doctor examples/sample-collector.yaml
@@ -183,58 +220,70 @@ mb plan examples/sample-collector.yaml
 mb dry-run examples/sample-collector.yaml --test test_pass --test test_pending
 mb run examples/sample-collector.yaml
 mb status examples/sample-collector.yaml
-mb collect examples/sample-collector.yaml
-mb status examples/sample-collector.yaml --details
 ```
 
-The first collect exits 2 (PENDING): PASS 2, FAIL 1, ERROR 1, SKIP 1,
-PENDING 1 and two collection errors. This is intentional.
+Run executes the commands. Command completion does not mean that external work
+has finished. Use the run directory printed by run, replacing `<run-id>` below.
 
-Use the run directory printed by run, replacing `<run-id>` below:
+## Collect 1/2: get the results available now
 
 ```sh
-python3 examples/sample_finish.py <run-id>
-mb collect examples/sample-collector.yaml --run-dir runs/sample-collector/<run-id>
-mb status examples/sample-collector.yaml --run-dir runs/sample-collector/<run-id> --details
 mb collect examples/sample-collector.yaml --run-dir runs/sample-collector/<run-id>
 ```
 
-Both later collects exit 1: all eight results are final but FAIL/ERROR remain.
-The second collect retries only unresolved Jobs; the third invokes no collectors.
-Final counts: PASS 5, FAIL 1, ERROR 1, SKIP 1. Inspect each project's
-collector_calls.txt to see which collectors ran. No-check never calls a collector.
+{first}
+Exit 2 means results remain unresolved. Do not start another run to collect them.
+
+## Make the remaining sample result available
+
+```sh
+python3 examples/sample_finish.py <run-id>{helper}
+```
+
+{completion}
+This is a project sample helper, not an MB repair command. The done file is a
+sample convention. In real use, your external system finishes the work.
+
+## Collect 2/2: get the remaining result
+
+```sh
+mb collect examples/sample-collector.yaml --run-dir runs/sample-collector/<run-id>
+mb status examples/sample-collector.yaml --run-dir runs/sample-collector/<run-id> --details
+```
+
+{last}
+No Job is rerun. All results are final; no further collect is needed for this run.
+Run executes commands; collect obtains results. If results are pending, collect
+the same run later. Final results are retained.
 
 ## Continue after stopping
 
 Execute the command shown at the paused step, then follow the remaining sequence.
-Do not rerun earlier commands unnecessarily: prepare invalidates setup/plan,
-and run creates a NEW run. Use --run-dir to inspect or collect an existing run.
-If a step failed, resolve its reported error before continuing. After interrupting
-run/collect, inspect status first; Jobs never executed cannot be collected.
-Invoking mb tutorial again creates another exercise; it does not resume this one.
+Do not repeat earlier stages unnecessarily: prepare invalidates setup/plan and
+run creates a NEW run. Use --run-dir for an existing run. If a step failed, fix
+its error first. After interrupting run/collect, inspect status; unexecuted Jobs
+cannot be collected. Invoking tutorial again creates a new exercise, not a resume.
 
-## Paths and changes
+## Paths and further exercises
 
 - work/sample-collector/.reg/: MB context, plan, state and latest-run pointer.
 - runs/sample-collector/<run-id>/: MB records, logs and result.json.
 - work/sample-results/<run-id>/<job-id>/: project result.txt, sim.log, tarmac.log,
-  mock wave.fsdb and collector call counts.
-- examples/: editable copies of the sample YAML and scripts.
+  mock wave.fsdb and collector_calls.txt (counts collection calls).
+- examples/: editable copies of the YAML and scripts.
 
-Commands use the invocation directory recorded at prepare time as cwd.
-The sample scripts choose their result location using MB_RUN_ID and MB_JOB_ID.
-Changing YAML requires prepare/setup/plan again; saved contracts do not snapshot
-script contents. Keep run and collector paths pointed at the same project.
+Commands use the invocation directory saved at prepare time as cwd. The sample
+scripts locate their results using MB_RUN_ID and MB_JOB_ID. Changing YAML needs
+prepare/setup/plan again; contracts do not snapshot script contents.
 
-To try a smaller new run: mb run examples/sample-collector.yaml --test test_pass.
-To inspect machine-readable state: mb status examples/sample-collector.yaml --json.
-For a one-shot fresh lifecycle: mb all examples/sample-collector.yaml (exit 2 is
-expected until the new run's pending results are resolved).
+Optional separate exercise: `mb tutorial --advanced` includes FAIL/ERROR/SKIP,
+no-check and collector fault recovery. Both modes collect exactly twice.
+To inspect JSON: `mb status examples/sample-collector.yaml --json`.
+For a smaller NEW run: `mb run examples/sample-collector.yaml --test test_pass`.
 
 ## Cleanup is optional
 
-Keep this entire directory to inspect or edit the exercise. When finished, move
-to its parent and remove ONLY this tutorial directory. The guided command prints
-its exact shell-quoted rm command. Nothing is removed automatically, and removing
-the directory also removes any edits made inside it.
+Keep the directory as a reference. When finished, move to its parent and remove
+ONLY this tutorial directory. The guided command prints the exact shell-quoted
+rm command. Nothing is deleted automatically; deletion also removes your edits.
 """
