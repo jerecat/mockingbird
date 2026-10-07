@@ -84,7 +84,6 @@ Run each lifecycle step:
 
 ```sh
 mb prepare regression.yaml
-mb setup regression.yaml
 mb plan regression.yaml
 mb dry-run regression.yaml
 mb run regression.yaml
@@ -92,9 +91,9 @@ mb status regression.yaml
 mb collect regression.yaml
 ```
 
-Prepare saves context; setup calls the adapter's setup operation (the built-in
-command adapter prepares its directory, not a project build); plan validates
-and saves the Job contracts. Dry-run previews the selection. Run executes the
+Prepare saves context; plan validates and saves the Job contracts. This example
+has no setup list, so setup is not required. For preparation commands and retries,
+see [Setup Contract](Setup_Contract.md). Dry-run previews the selection. Run executes the
 commands. Collect obtains their results.
 
 **No-check is only useful for Jobs that deliberately need no judgement.** It
@@ -131,7 +130,7 @@ Replace the Job's `collect` mapping with:
         timeout_s: 10
 ```
 
-Run **prepare, setup, and plan again** to adopt the changed definition, then run
+Run **prepare and plan again** to adopt the changed definition, then run
 and collect. Editing YAML does not change an already prepared context or saved
 run. A previous no-check result will remain final; use the new run.
 
@@ -180,7 +179,7 @@ Each Job inherits defaults and replaces explicitly specified fields. Arrays and
 from both defaults and the Job, it becomes `[job_id]`. Collector arguments follow
 the same rule independently. Explicit `args: []` means no arguments.
 
-Repeat prepare/setup/plan after changing the definition. Repeated run creates
+Repeat prepare/plan after changing this definition. Repeated run creates
 new run IDs; collect/status without `--run-dir` select the latest run. To collect
 an older run, use the explicit path printed by that run:
 

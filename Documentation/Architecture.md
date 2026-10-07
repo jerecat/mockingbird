@@ -32,7 +32,7 @@ regression.yaml
       |
  context.json
       |
-    setup   ---- ExecutionAdapter ---> project setup
+    setup   ---- command list, then ExecutionAdapter hook ---> project setup
       |
     plan    <--- ExecutionAdapter ---- canonical Jobs
       |
@@ -271,3 +271,7 @@ and collection.json are authoritative checkpoints. Run-level executions.json,
 collection.json and result.json are derived views, not recovery inputs for new
 runs. An incomplete selected set has aggregate status PENDING, never PASS.
 See ADR 0008 and ADR 0010 for checkpoint ownership and legacy compatibility.
+
+Declarative setup and failure invalidation are defined by
+[ADR 0012](ADR/0012-declarative-setup-and-retry.md). The standard command adapter
+requires no setup cycle when its top-level setup list is empty or omitted.

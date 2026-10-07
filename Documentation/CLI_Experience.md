@@ -15,7 +15,6 @@ collector faults; a completed tutorial still exits zero.
 
 ```sh
 mb prepare examples/sample-collector.yaml
-mb setup examples/sample-collector.yaml
 mb plan examples/sample-collector.yaml
 mb dry-run examples/sample-collector.yaml
 mb run examples/sample-collector.yaml
@@ -33,7 +32,6 @@ For example, running before preparation reports on stderr:
 Error: context not prepared
 Required steps:
   mb prepare examples/sample-collector.yaml
-  mb setup examples/sample-collector.yaml
   mb plan examples/sample-collector.yaml
 Then retry your command.
 ```
@@ -48,7 +46,7 @@ obtain one when investigating a failure. Parser usage errors still show help.
 | Command | Default | Machine output |
 | --- | --- | --- |
 | prepare | Prepared workspace, sources, next command | `--json`: full context |
-| setup | Completion and next command | Saved workspace metadata |
+| setup | Per-command progress, attempt path, next command; skipped when not required | Per-attempt records and logs |
 | plan | Validated Job IDs and next command | Saved `plan.json` |
 | dry-run | Selection checklist; no execution | Saved plan remains unchanged |
 | run | Per-Job progress, saved run path, collect command | Saved execution records |
@@ -111,3 +109,6 @@ warnings with their identifying check and reason. A warning gives ATTENTION,
 not an all-clear summary; the existing exit policy remains unchanged (FAIL = 1,
 otherwise 0). Fixed capacity zero is valid but stops dispatch, so it is shown as
 waiting rather than an execution-ready slot.
+
+Setup command lists and edit/retry behaviour are described in [Setup Contract](Setup_Contract.md).
+With no setup list, the standard command adapter permits prepare directly followed by plan.

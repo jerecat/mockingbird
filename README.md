@@ -46,7 +46,7 @@ regression.yaml
       |
    prepare  --> context.json
       |
-    setup
+    setup (when configured; custom adapter hooks also require it)
       |
      plan   --> plan.json
       |
@@ -347,3 +347,8 @@ Start here:
 
 See [CLI output and recovery](Documentation/CLI_Experience.md) for human summaries,
 JSON options, error recovery, and exit codes.
+
+Project preparation can be declared as a top-level `setup.jobs` list. See
+[Setup contract and retry workflow](Documentation/Setup_Contract.md) and
+`examples/setup-commands.yaml`. Without setup commands, the standard command
+adapter can go directly from prepare to plan.

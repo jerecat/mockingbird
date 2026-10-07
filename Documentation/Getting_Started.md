@@ -83,7 +83,6 @@ runs/<run-id>/jobs/<job>/
 ```bash
 mockingbird doctor examples/sanity-linux.yaml
 mockingbird prepare examples/sanity-linux.yaml
-mockingbird setup examples/sanity-linux.yaml
 mockingbird plan examples/sanity-linux.yaml
 mockingbird dry-run examples/sanity-linux.yaml
 mockingbird run examples/sanity-linux.yaml --interactive
@@ -127,3 +126,6 @@ Use [Execution Contract](Execution_Contract.md) as the field reference and
 Only read the adapter implementation/conformance guides when the declarative
 boundary is genuinely insufficient and a custom Python adapter is needed.
 
+
+For project preparation commands and failed-setup retries, see [Setup Contract](Setup_Contract.md).
+Setup is optional for command definitions with no setup list.

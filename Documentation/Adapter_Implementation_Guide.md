@@ -87,6 +87,12 @@ Return `CheckResult` objects. Do not perform a full regression here.
 
 ### setup
 
+Top-level declarative setup commands, when present, run before this hook. A custom
+adapter still requires its setup hook even without those commands. Starting a
+setup attempt invalidates previous setup success and its plan; raise on failure.
+Command logs are recorded by MB; custom hook I/O remains adapter-owned.
+See [Setup Contract](Setup_Contract.md).
+
 Prepare reusable prerequisites. It should be safe enough to call repeatedly.
 The conformance kit calls it twice intentionally.
 

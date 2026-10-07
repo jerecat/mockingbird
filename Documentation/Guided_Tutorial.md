@@ -32,7 +32,8 @@ overwritten by another invocation.
 The default exercise uses test_pass and test_pending from the existing sample.
 Only the copied YAML is reduced to these two Jobs; repository examples stay intact.
 
-1. Doctor, prepare, setup and plan explain preparation. Doctor's OK does not mean
+1. Doctor, prepare and plan explain preparation. The sample has no setup commands,
+   so it skips setup. Doctor's OK does not mean
    a test ran; use `doctor --details` for individual diagnostics.
 2. Preview the two Jobs, run them serially, and inspect execution records.
 3. **Collect 1/2 — results available now:** test_pass becomes PASS; test_pending
@@ -82,7 +83,7 @@ cleanup or overwrite.
 Each exercise gets a `GUIDE.md` containing the full manual command sequence,
 expected results, directory meanings, and continuation instructions. After `q`,
 follow the displayed `cd` command and run the command shown at the paused step.
-Do not restart earlier stages unnecessarily: prepare invalidates setup/plan,
+Do not restart earlier stages unnecessarily: prepare invalidates the saved plan,
 and run creates a new run. Collect/status can target a saved run with --run-dir.
 
 Ctrl+C during a child CLI command waits for that command to stop; execution may

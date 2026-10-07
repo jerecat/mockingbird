@@ -153,3 +153,11 @@ Adapter_Conformance_Testing.md.
     [ ] collector returns one final result or unresolved outcome per requested Job
     [ ] large logs remain files
     [ ] no secret is written into context/result/check messages
+
+## Optional preparation commands
+
+A top-level `setup.jobs` list can prepare the project before plan/run. Commands
+run serially and must exit zero; failed attempts preserve logs and can be retried
+after editing scripts or sources. See [Setup Contract](Setup_Contract.md).
+Without setup commands, the built-in command adapter does not require a setup
+cycle; the explicit setup command in the lifecycle above may be omitted.

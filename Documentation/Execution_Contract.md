@@ -191,3 +191,9 @@ project collector, or choose no-check if result judgement is not required.
 
 Custom Python ExecutionAdapter remains an advanced escape hatch. See
 Adapter_Implementation_Guide.md for TestResult versus CollectionAttempt.
+
+## Preparation before the run list
+
+An optional top-level `setup` list uses the same command/args/timeout field rules
+without collectors. Its exit codes determine preparation success. This does not
+change run/collect judgement rules. See [Setup Contract](Setup_Contract.md).
