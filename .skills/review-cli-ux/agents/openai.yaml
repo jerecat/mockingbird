@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review CLI UX"
+  short_description: "Review Mockingbird CLI journeys and recovery"
+  default_prompt: "Use $review-cli-ux to review and improve the Mockingbird command-line experience."
