@@ -162,6 +162,27 @@ mb all examples/linux-commands.yaml
 This function applies to the current shell session. Run bundled examples from
 the clone root. No packages are installed or shared Python settings changed.
 
+### Optional: run tests with Python 3.10
+
+If pytest is already available in the shared environment, run from the clone root:
+
+```sh
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
+python3 -m pytest -q --ignore=tests/test_cli_aliases.py
+```
+
+This disables automatic loading of third-party pytest plugins and excludes two
+CLI registration tests that import Python 3.11's `tomllib`. The current expected
+result is **241 passed**. This was verified with Python 3.10.19, PyYAML 5.4.1 and
+pytest 8.4.2; pytest 9.0.3 has not yet been verified in this combination.
+
+Tests create temporary files in pytest's temporary directory, normally under
+`/tmp` (environment settings such as `TMPDIR` can change this). They may also
+create pytest cache and Python bytecode files in the clone. The tests use local
+Git repositories and mock simulator output; they do not require remote servers,
+a simulator, or simulator licences. This is not a filesystem sandbox: Python,
+libraries, system commands and Git configuration may be read outside the clone.
+
 ## Workspace/run layout
 
 Relative paths are based on the directory where `mockingbird` is invoked.
