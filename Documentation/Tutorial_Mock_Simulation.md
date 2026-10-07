@@ -39,6 +39,11 @@ mb run examples/sample-collector.yaml
 Eight Jobs execute in list order. Copy the final directory name from the printed
 `run:` path. Replace the example ID below with the ID from your own run.
 
+Run prints each command's execution transitions. You can also use
+`mb status examples/sample-collector.yaml` before collecting: execution is finished
+but all eight collection outcomes are still uncollected. Command completion does
+not imply external completion. See [Execution and collection status](Execution_Status.md).
+
 ```sh
 RUN_ID=20261007_140000_000000_sample-collector
 RUN_DIR="runs/sample-collector/$RUN_ID"

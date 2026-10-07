@@ -165,6 +165,10 @@ See [ADR 0010](Documentation/ADR/0010-checkpoint-ownership-and-prepare-validity.
 
 ## Lifecycle
 
+`mb run` shows command progress. Use `mb status <definition>` from another
+terminal to inspect the latest saved execution and collection states, even before
+the first collect. See [Execution and collection status](Documentation/Execution_Status.md).
+
 Step-by-step walkthrough:
 [Mock Simulation Integration Tutorial](Documentation/Tutorial_Mock_Simulation.md).
 

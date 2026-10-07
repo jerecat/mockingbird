@@ -128,7 +128,7 @@ def preview(defn: dict[str, Any], selection: Selection) -> tuple[dict, list[Job]
 
 
 def run(
-    defn: dict[str, Any], selection: Selection | None = None
+    defn: dict[str, Any], selection: Selection | None = None, *, on_progress=None
 ) -> tuple[list[JobExecution], Path, dict]:
     selection = selection or Selection()
     context, adapter, capacity = _components(defn)
@@ -171,11 +171,21 @@ def run(
         },
     }
     write_json(run_dir / "run.json", run_record)
+    # Publish the current run before dispatch so another terminal can inspect it.
+    write_json(metadata_path(defn) / "last_run.json", {"run_dir": str(run_dir.resolve())})
 
     scheduler = context["scheduler"]
     started = time.monotonic()
 
     completed: list[JobExecution] = []
+    positions = {job.id: index for index, job in enumerate(selected, 1)}
+
+    def progress(job, state, execution=None):
+        event = {"job_id": job.id, "index": positions[job.id], "total": len(selected),
+                 "state": state, "updated_at": _now()}
+        write_json(run_dir / "progress.json", event)
+        if on_progress:
+            on_progress(event, execution)
 
     def execute(job: Job) -> JobExecution:
         execution_context = execution_contexts[job.id]
@@ -193,6 +203,7 @@ def run(
         # Persist each returned execution before the scheduler consumes it.
         write_json(Path(execution_context.job_dir) / "execution.json", result.to_dict())
         completed.append(result)
+        progress(job, "COMMAND_FINISHED", result)
         if error is not None:
             raise error
         return result
@@ -204,6 +215,7 @@ def run(
             capacity,
             scheduler["max_parallel"],
             scheduler["poll_interval_s"],
+            on_progress=progress,
         )
         run_record["status"] = "EXECUTED"
         return_value = executions
@@ -272,7 +284,23 @@ def collect(
 ) -> tuple[dict[str, Any], Path]:
     run_path = _resolve_run_dir(defn, run_dir)
     with collection_lock(run_path):
-        return _collect_locked(defn, run_path)
+        # Keep progress separate from the authoritative collection checkpoints.
+        context = read_json(run_path / "context.json")
+        validate_definition_identity(defn, context)
+        record = read_json(run_path / "run.json")
+        if record.get("status") not in {"EXECUTED", "COLLECTED", "ERROR", "INTERRUPTED"}:
+            raise RuntimeError(f"run is not collectable; status={record.get('status')!r}: {run_path}")
+        progress = {"state": "RUNNING", "updated_at": _now()}
+        write_json(run_path / "collection_progress.json", progress)
+        try:
+            result = _collect_locked(defn, run_path)
+        except BaseException:
+            progress.update(state="STOPPED", updated_at=_now())
+            write_json(run_path / "collection_progress.json", progress)
+            raise
+        progress.update(state="FINISHED", updated_at=_now())
+        write_json(run_path / "collection_progress.json", progress)
+        return result
 
 
 def _collect_locked(defn, run_path):

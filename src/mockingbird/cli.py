@@ -5,10 +5,10 @@ import json
 from pathlib import Path
 
 from . import lifecycle
-from .context import load_definition, metadata_path, prepare
+from .context import load_definition, prepare
 from .doctor import doctor_failed, run_doctor
-from .io import read_json
 from .selection import Selection, write_selection_file
+from .status import snapshot
 
 
 def _add_selection_args(parser: argparse.ArgumentParser) -> None:
@@ -95,6 +95,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     status = sub.choices["status"]
     status.add_argument("--run-dir")
+    status.add_argument("--json", action="store_true", help="print the saved-state snapshot as JSON")
 
     all_cmd = sub.choices["all"]
     _add_selection_args(all_cmd)
@@ -103,15 +104,48 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _status(defn: dict, run_dir: str | None) -> None:
-    if run_dir:
-        path = Path(run_dir).resolve() / "result.json"
-    else:
-        pointer = metadata_path(defn) / "last_result.json"
-        if not pointer.exists():
-            raise RuntimeError("no collected result yet")
-        path = Path(read_json(pointer)["result"])
-    print(path.read_text(), end="")
+def _status(defn: dict, run_dir: str | None, as_json=False) -> None:
+    data = snapshot(defn, run_dir)
+    if as_json:
+        print(json.dumps(data, indent=2))
+        return
+    print(f"Run: {data['run_id']}")
+    print(f"Execution (last recorded): {data['execution_status']}; {data['recorded']}/{data['total']} execution records")
+    print(f"Last execution update: {data['last_execution_update']}")
+    sweep = data['collection_sweep']
+    phase = sweep.get('state', 'NOT_STARTED' if not any(j['observed_at'] for j in data['jobs']) else 'UNKNOWN')
+    print(f"Collection: {data['final']}/{data['total']} final; sweep (last recorded): {phase}")
+    counts = data['collection_counts']
+    print(f"  pending={counts['PENDING']}, collection_error={counts['ERROR']}, uncollected={counts['UNCOLLECTED']}")
+    if sweep:
+        print(f"Last collection update: {sweep['updated_at']}")
+    for job in data['jobs']:
+        state = "COLLECTION_ERROR" if job['collection'] == "ERROR" else job['collection']
+        verdict = job['verdict'] or "-"
+        print(f"  {job['id']}: execution={job['execution']}; collection={state}; verdict={verdict}")
+        if job['reason']:
+            print(f"    Last collector report ({job['observed_at']}): {job['reason']}")
+    print("Saved observations only; process liveness is not checked. Command completion does not imply external completion.")
+
+
+def _progress(event, execution):
+    text = {"WAITING_CAPACITY": "waiting for capacity", "EXECUTING": "executing",
+            "COMMAND_FINISHED": "command finished"}[event['state']]
+    if execution and isinstance(execution.observation, dict):
+        observation = execution.observation
+        if observation.get('timed_out'):
+            text += " (timed out)"
+        elif 'returncode' in observation:
+            text += f" (exit={observation['returncode']})"
+        elif 'launch_error' in observation or 'executor_error' in observation:
+            text += " (execution error)"
+    print(f"[{event['index']}/{event['total']}] {event['job_id']}: {text}", flush=True)
+
+
+def _execution_summary(executions, run_dir):
+    print(f"Execution finished: {len(executions)} execution records (external completion not checked)")
+    print("Collection: not started")
+    print(f"run: {run_dir}", flush=True)
 
 
 def main() -> None:
@@ -160,12 +194,12 @@ def main() -> None:
             if not _confirm():
                 print("run: cancelled")
                 return
-        executions, run_dir, _ = lifecycle.run(defn, selection)
-        print(f"executed: {len(executions)}")
-        print(f"run: {run_dir}")
+        executions, run_dir, _ = lifecycle.run(defn, selection, on_progress=_progress)
+        _execution_summary(executions, run_dir)
         return
 
     if args.command == "collect":
+        print("Collection started", flush=True)
         result, run_dir = lifecycle.collect(defn, args.run_dir)
         print(_summary(result))
         print(f"run: {run_dir}")
@@ -174,7 +208,7 @@ def main() -> None:
         return
 
     if args.command == "status":
-        _status(defn, args.run_dir)
+        _status(defn, args.run_dir, args.json)
         return
 
     if args.command == "all":
@@ -188,7 +222,9 @@ def main() -> None:
             if not _confirm():
                 print("run: cancelled")
                 return
-        _, run_dir, _ = lifecycle.run(defn, selection)
+        executions, run_dir, _ = lifecycle.run(defn, selection, on_progress=_progress)
+        _execution_summary(executions, run_dir)
+        print("Collection started", flush=True)
         result, _ = lifecycle.collect(defn, run_dir)
         print(_summary(result))
         print(f"run: {run_dir}")

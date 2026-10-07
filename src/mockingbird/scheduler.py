@@ -20,6 +20,7 @@ def run_jobs(
     capacity,
     max_parallel: int,
     poll_interval_s: float,
+    on_progress=None,
 ) -> list[JobExecution]:
     """Run jobs under a hard local cap and the latest reported capacity.
 
@@ -40,7 +41,13 @@ def run_jobs(
     # while context-manager shutdown drains the current Job and its evidence.
     with ThreadPoolExecutor(max_workers=1) as pool:
         for job in jobs:
+            waiting = False
             while capacity_slots(capacity.available_slots()) == 0:
+                if not waiting and on_progress:
+                    on_progress(job, "WAITING_CAPACITY")
+                waiting = True
                 time.sleep(poll_interval_s)
+            if on_progress:
+                on_progress(job, "EXECUTING")
             results.append(pool.submit(execute, job).result())
     return results

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Show serial command progress and publish the latest run before dispatch.
+- Show saved execution and collection states in `status`, including before first
+  collection and after partial collection; add `status --json` for snapshots.
+- Display collector reasons as timestamped observations, without external polling
+  or changes to the collector contract. Saved RUNNING state is not a liveness check.
+
 - Reuse existing Git/SVN checkouts without updating, cleaning, resetting or
   rejecting local edits. Record created/reused and the prepare-time local
   revision; changed source URLs/revisions apply only to new checkouts.
