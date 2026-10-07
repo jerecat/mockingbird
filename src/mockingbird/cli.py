@@ -128,6 +128,9 @@ def build_parser() -> argparse.ArgumentParser:
     status.add_argument("--details", action="store_true", help="include collector reasons and observation times")
     for name in ("prepare", "collect"):
         sub.choices[name].add_argument("--json", action="store_true", help="print JSON instead of the human summary")
+    tutorial = sub.add_parser("tutorial", help="walk through the mock simulation in a new directory")
+    tutorial.add_argument("--directory", help="new exercise directory (must not already exist)")
+    tutorial.add_argument("--yes", action="store_true", help="run all tutorial steps without pausing")
     for cmd in sub.choices.values():
         cmd.add_argument("--debug", action="store_true", default=argparse.SUPPRESS,
                          help="show a traceback on errors")
@@ -212,6 +215,10 @@ def _execution_summary(executions, run_dir):
 
 
 def _dispatch(args, parser) -> None:
+    if args.command == "tutorial":
+        from .tutorial import run_tutorial
+        run_tutorial(args.directory, args.yes)
+        return
     defn = load_definition(args.definition)
 
     if args.command == "doctor":

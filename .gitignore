@@ -12,3 +12,7 @@ work-self/
 runs-self/
 work-external/
 runs-external/
+
+
+# Default directories created by mb tutorial.
+/mb-tutorial-*/
