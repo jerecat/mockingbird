@@ -172,9 +172,25 @@ python3 -m pytest -q --ignore=tests/test_cli_aliases.py
 ```
 
 This disables automatic loading of third-party pytest plugins and excludes two
-CLI registration tests that import Python 3.11's `tomllib`. All collected tests should pass. This workaround was verified with
-Python 3.10.19, PyYAML 5.4.1 and
-pytest 8.4.2; pytest 9.0.3 has not yet been verified in this combination.
+CLI registration tests that import Python 3.11's `tomllib`. Without the
+`--ignore` option, Python 3.10 fails during test collection. No other exclusions
+are needed, including for the lifecycle side-effect tests.
+
+Verified on Linux with Python 3.10.19, PyYAML 5.4.1 and pytest 9.0.3:
+291 tests passed (the two CLI registration tests excluded). This records the
+suite at verification time; the count will grow as tests are added. Python
+versions below 3.10 have not been verified.
+
+The optional targeted mutation check also works in that environment:
+
+```sh
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
+python3 tools/check_lifecycle_mutations.py
+```
+
+All four seeded regressions were detected. This command runs only the focused
+lifecycle tests, so it does not need the `tomllib` exclusion. It requires no
+additional packages beyond the existing test environment.
 
 Tests create temporary files in pytest's temporary directory, normally under
 `/tmp` (environment settings such as `TMPDIR` can change this). They may also
