@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -73,9 +74,16 @@ class Provider(SourceProvider):
             if destination.exists() and any(destination.iterdir()):
                 raise RuntimeError(f"source destination is not empty: {destination}")
             destination.parent.mkdir(parents=True, exist_ok=True)
-            _run(["git", "clone", "--no-checkout", url, str(destination)])
-            resolved = _resolve_revision(destination, revision)
-            _run(["git", "checkout", "--detach", resolved], cwd=destination)
+            # Publish only a complete checkout. A failed initial clone/checkout
+            # must not become a reusable user tree on the next prepare.
+            with tempfile.TemporaryDirectory(prefix=f".{destination.name}-clone-",
+                                             dir=destination.parent) as staging:
+                checkout = Path(staging) / "checkout"
+                _run(["git", "clone", "--no-checkout", url, str(checkout)])
+                resolved = _resolve_revision(checkout, revision)
+                _run(["git", "checkout", "--detach", resolved], cwd=checkout)
+                # Rename on the same filesystem. Never replace a nonempty tree.
+                checkout.rename(destination)
 
         # Existing worktrees belong to the user, including local edits, index,
         # branches, ignored outputs and remote configuration. Inspect only.

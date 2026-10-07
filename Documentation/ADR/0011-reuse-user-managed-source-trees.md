@@ -13,6 +13,10 @@ Mockingbird does not implement version control or track editing history.
 - If no checkout exists, Git/SVN providers acquire the requested URL/revision.
   A non-empty directory without the expected checkout metadata is left untouched
   and reported as an error; it cannot safely be treated as a checkout.
+- Initial Git acquisition clones and checks out the requested revision in a
+  temporary sibling directory, then publishes the complete checkout. Failed
+  acquisition leaves no new checkout at the destination, so prepare can retry
+  after the configuration is corrected. Existing destination files are preserved.
 - If a checkout exists, reuse it as-is. Git does not fetch, checkout, reset,
   clean or change remotes. SVN does not switch or update. No dirty gate is added.
 - Evidence records `materialization: created` or `reused`, plus the actual local
@@ -40,3 +44,6 @@ The incomplete-prepare marker from ADR 0010 still guards failed preparation.
 Context and plan remain frozen metadata/contracts, while source trees remain
 user-managed and mutable. The rule applies to built-in Git/SVN providers; custom
 SourceProviders must document their own materialisation semantics.
+
+An incomplete Git checkout left by an older version is still user-managed.
+Repair it with Git or select a fresh workspace; prepare does not reset it.
