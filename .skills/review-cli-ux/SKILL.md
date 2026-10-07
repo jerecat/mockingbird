@@ -51,6 +51,12 @@ cleanup instructions limited to the created directory. Use normal CLI paths.
 Explain intentional nonzero outcomes before running them, verify resulting state,
 and stop on genuine failures rather than continuing a misleading success tour.
 
+Keep the default tutorial focused on the smallest complete user workflow with
+a clear finishing point. Label repeated commands by their different purpose.
+Move fault injection into an optional advanced path; keep idempotence proofs in
+tests rather than mandatory repeated user steps. Explain which actions simulate
+external work, so sample helpers are not mistaken for product repair commands.
+
 ## Apply these rules
 
 1. Answer: what happened, what needs attention, and what the user can do next.
