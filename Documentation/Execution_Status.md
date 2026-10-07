@@ -33,6 +33,7 @@ A returning submit command does not mean its external work has finished.
 mb status examples/sample-collector.yaml
 mb status examples/sample-collector.yaml --run-dir runs/sample-collector/<run-id>
 mb status examples/sample-collector.yaml --json
+mb status examples/sample-collector.yaml --details
 ```
 
 Without `--run-dir`, status selects the workspace's latest run, published before
@@ -46,8 +47,8 @@ The default output shows:
 - Final collection count, pending count, collection-error count and uncollected
   count. Final ERROR judgements count as final, not collection errors.
 - Last recorded collection sweep state and update time.
-- Each Job's execution and collection state, with the last collector reason and
-  its observation time when present.
+- An aligned table of each Job's execution state, collection state, and verdict.
+- With `--details`, the last collector reason and its observation time.
 
 `status --json` returns this observation snapshot for scripts. The default status
 output is now human-readable rather than the old raw `result.json` output.
@@ -61,7 +62,7 @@ Consumers requiring final result data should continue reading the run's
 ```
 
 The collector may instead report `queued` or another project-owned explanation.
-Status displays it as the **last collector report**, with its saved timestamp.
+Status with `--details` displays it as the **last collector report**, with its saved timestamp.
 It does not call the collector, query the external queue or start a polling loop.
 Run collect again to obtain a newer observation.
 

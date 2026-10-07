@@ -328,3 +328,6 @@ Start here:
 - `Documentation/Integration_Guide.md`
 - `Documentation/Demos.md`
 - `Documentation/ADR/`
+
+See [CLI output and recovery](Documentation/CLI_Experience.md) for human summaries,
+JSON options, error recovery, and exit codes.

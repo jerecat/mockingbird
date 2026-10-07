@@ -144,3 +144,7 @@ conventions. The return format Mockingbird requires is the collector's JSON.
 Use `mb run` to create a new run when trying a different final verdict. Editing
 the original logs does not cause repeated collect to rejudge final results.
 Each run's files remain in its own directory.
+
+For collector reasons, use `mb status examples/sample-collector.yaml --details`.
+Normal output uses human summaries; use `prepare --json` or `collect --json`
+when you need JSON on stdout. See [CLI output and recovery](CLI_Experience.md).
