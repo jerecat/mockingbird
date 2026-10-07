@@ -57,6 +57,12 @@ Move fault injection into an optional advanced path; keep idempotence proofs in
 tests rather than mandatory repeated user steps. Explain which actions simulate
 external work, so sample helpers are not mistaken for product repair commands.
 
+For preparation changes, exercise setup failure -> script/source edit -> setup
+retry -> plan -> run. Preserve each attempt's logs and partial outputs, invalidate
+old success before retry, and check that failed/incomplete setup blocks old plans.
+Distinguish live script edits from frozen YAML contracts. Do not require empty
+setup steps for the standard command path; keep custom adapter hook semantics.
+
 ## Apply these rules
 
 1. Answer: what happened, what needs attention, and what the user can do next.
