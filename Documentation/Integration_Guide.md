@@ -22,7 +22,7 @@ Describe that directly:
         - test_a
         - test_b
       collect:
-        mode: exit-code
+        mode: no-check
 
     scheduler:
       capacity_provider: fixed
@@ -42,27 +42,36 @@ A string Job entry means command + Job ID. Use a mapping only when argv differs:
 
 ## 2. Choose result collection explicitly
 
-For a synchronous command whose exit status is the test result:
-
-    collect:
-      mode: exit-code
-
-For compile + submit + return workflows:
+Without collect, the resolved contract uses no-check: PASS with no evidence
+inspection. Choose an explicit project collector for checked results:
 
     collect:
       command: ["./collect.sh"]
       timeout_s: 60
 
-Mockingbird appends the Job ID:
+Without collector args, the resolved args is [job_id]:
 
     ./collect.sh pcie_dma_write
 
-The collector prints one JSON object to stdout:
+Both commands receive MB_JOB_ID and MB_RUN_ID in the environment. The project
+uses these to associate its external work/results. No external scheduler IDs
+or directory layout are required by MB.
+
+The collector prints one JSON object and exits zero:
 
     {"status":"PASS","artifacts":["artifact://pcie_dma_write/sim.log"]}
 
-The same collector is reused for every Job. Project code may use a default rule
-plus a small exception map internally; Mockingbird does not know that policy.
+If results are not ready:
+
+    {"status":"PENDING"}
+
+Collector failures are collection errors, separate from final test judgements.
+Repeated collect retries only unresolved Jobs and retains final results.
+
+Common fields can be written under execution.defaults. Each Job can override
+command, args, timeout_s and the entire collect mapping. Plan expands all defaults,
+validates the full contracts, and freezes them. Unknown fields and invalid values
+are rejected. args: [] explicitly requests no arguments.
 
 ## 3. Capacity is independent of execution
 
@@ -104,8 +113,9 @@ After the project/system says results are ready:
 
     mb collect regression.yaml --run-dir runs/<chosen-run>
 
-Mockingbird does not remain resident to poll the scheduler. Do not use mb all
-unless collection is valid immediately after run.sh returns.
+Repeat this command later for PENDING/collection-error Jobs. Mockingbird does not
+remain resident to poll the scheduler. mb all performs just one collection sweep;
+if incomplete, continue collecting the same run explicitly.
 
 ## 5. Source integration
 
@@ -133,6 +143,7 @@ Adapter_Conformance_Testing.md.
     [ ] one permitted Job starts one project command
     [ ] capacity never admits work above the declared gate
     [ ] async capacity query accounts for already handed-off external work
-    [ ] collector returns exactly one canonical result per executed Job
+    [ ] collector returns one final result or unresolved outcome per requested Job
     [ ] large logs remain files
     [ ] no secret is written into context/result/check messages
+

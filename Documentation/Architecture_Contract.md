@@ -139,8 +139,9 @@ integrations demonstrate a stable common meaning.
 
 ## AC-16: The collected result envelope is deliberately small
 
-The project-owned collector returns one canonical result for each executed
-Mockingbird Job. Core requires only:
+The collector returns one outcome per requested executed Mockingbird Job.
+An outcome is either an unresolved CollectionAttempt (PENDING/ERROR), or a final
+TestResult. Core requires only these fields for a final result:
 
 ```text
 id          Mockingbird Job ID
@@ -148,7 +149,8 @@ status      PASS | FAIL | ERROR | SKIP
 artifacts   list[str]
 ```
 
-The collected result ID set must match the executed Job ID set.
+Each collection call must match its requested Job IDs. Final results are a subset
+of the selected set until collection completes; they then match that set exactly.
 
 `artifacts` contains opaque references chosen by the collector. References are
 not required to be filesystem paths. Core preserves them but does not classify,
@@ -166,13 +168,15 @@ contract in regression.yaml, not by implementing Mockingbird Python code.
 
 The normal boundary declares:
 
-    project command
+    per-Job command and argv
     finite local timeout
-    Job IDs and optional per-Job argv
-    result collection contract
+    Job identity
+    per-Job result collection contract
 
-A string Job entry means: use the Job ID as the single argument to the project
-command. A mapping may override argv and timeout. Python ExecutionAdapter
+Plan applies defaults then overwrites explicit Job fields, validates, and saves
+complete contracts. A string Job uses its ID as argv unless defaults supplies
+args. A mapping may override command, args, timeout, and the whole collect mapping.
+Absent collect resolves to no-check. Execution never resolves defaults again. Python ExecutionAdapter
 implementations remain supported only as an advanced escape hatch.
 
 ## AC-18: One permitted Job means one project command
@@ -184,8 +188,7 @@ Mockingbird must not split that command into compile, submit, monitor, or other
 project-specific phases. The project command may perform those operations
 internally because that is the same boundary a human uses from a terminal.
 
-The local command wait is finite. execution.timeout_s is therefore mandatory for
-the declarative executor. On return or timeout, Mockingbird releases its local
+The local command wait is finite. A finite positive timeout_s is therefore mandatory in every resolved Job. On return or timeout, Mockingbird releases its local
 execution resources. Mockingbird does not create a resident daemon or detached
 monitor to follow externally handed-off work.
 
@@ -205,3 +208,20 @@ dispatch remains stopped until capacity permits it again.
 For asynchronous external hand-off, the CapacityProvider is responsible for
 including already submitted external work in later capacity samples before more
 Jobs are admitted. Core does not track external scheduler Job IDs.
+
+
+## AC-20: Execution evidence and collection state are separate
+
+Return codes and timeouts remain execution evidence. The declarative executor
+never derives TestResult from them. no-check returns PASS without checking them.
+Each returned execution is persisted before waiting for the entire run to finish.
+
+## AC-21: Collection closes one immutable selected set
+
+Contract, execution evidence, and result link by Job ID within one run. Repeated
+collect visits only uncollected/PENDING/collection-error executions; it never
+reruns execution or replaces a final result. PENDING and collection ERROR are
+not final test judgements. Each outcome is checkpointed independently. A run is
+not reported as PASS while any selected Job remains unresolved.
+
+See ADR 0008 and Execution_Contract.md for the schema and external protocol.

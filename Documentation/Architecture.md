@@ -61,7 +61,7 @@ Context -> Plan -> Run -> Result
 Core may know:
 
 - lifecycle ordering;
-- canonical `Job`, `ExecutionContext`, `JobExecution`, and `TestResult` models;
+- canonical `Job`, `ExecutionContext`, `JobExecution`, `CollectionAttempt`, and `TestResult` models;
 - ID-based selection;
 - generic concurrency and polling;
 - per-job directory allocation;
@@ -98,7 +98,7 @@ probe(context) -> list[CheckResult]
 setup(context)
 plan(context) -> list[Job]
 execute(context, job, execution_context) -> JobExecution
-collect(context, executions) -> list[TestResult]
+collect(context, executions) -> list[TestResult | CollectionAttempt]
 ```
 
 `Job.payload` and `JobExecution.observation` are opaque to core.
@@ -252,3 +252,17 @@ Tests enforce that:
 
 See `Architecture_Contract.md`, `Execution_Contract.md`,
 `Adapter_Implementation_Guide.md`, and `Adapter_Conformance_Testing.md`.
+
+
+## Resolved contracts and collection cycles
+
+Plan expands defaults into full per-Job command/args/timeout/collect payloads,
+validates, and freezes them. Missing collect becomes no-check. Dispatch remains
+list-ordered and capacity-gated; there is no dependency graph.
+
+Execution records are saved per Job as they return. Collection state is distinct
+from execution evidence and final TestResult. CollectionAttempt carries PENDING
+or ERROR when no final judgement is available. Repeated collect checkpoints
+only unresolved Jobs; final results remain unchanged. collection.json is the
+checkpoint and result.json is its user-facing snapshot. An incomplete selected
+set has aggregate status PENDING, never PASS. See ADR 0008.

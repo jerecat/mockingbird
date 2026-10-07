@@ -63,14 +63,14 @@ def _normalize_execution(execution: Any) -> dict[str, Any]:
         raise ValueError("execution must be a mapping")
 
     if execution.get("adapter"):
-        if "command" in execution:
+        if set(execution) - {"adapter", "config"}:
             raise ValueError(
                 "execution cannot define both adapter and top-level command; "
                 "put adapter-specific values under execution.config"
             )
         return dict(execution)
 
-    if "command" not in execution:
+    if not any(key in execution for key in ("command", "defaults", "jobs")):
         raise ValueError("execution requires either command or adapter")
 
     # Declarative command execution is the normal path. Internally it still
@@ -202,3 +202,4 @@ def update_state(defn: dict[str, Any], **values: Any) -> dict[str, Any]:
 def load_state(defn: dict[str, Any]) -> dict[str, Any]:
     path = metadata_path(defn) / "state.json"
     return read_json(path) if path.exists() else {}
+

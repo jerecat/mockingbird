@@ -4,13 +4,14 @@ import hashlib
 import json
 import re
 import time
+from threading import Lock
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from .context import load_context, load_state, metadata_path, update_state
-from .io import read_json, write_json
-from .models import ExecutionContext, Job, JobExecution, TestResult
+from .io import collection_lock, read_json, write_json
+from .models import CollectionAttempt, ExecutionContext, Job, JobExecution, TestResult
 from .plugins import load_adapter, load_capacity_provider
 from .scheduler import run_jobs
 from .selection import Selection, select_jobs
@@ -99,11 +100,16 @@ def create_plan(defn: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError("setup is missing or stale; run 'mockingbird setup' first")
 
     adapter = load_adapter(str(context["execution"]["adapter"]))
-    jobs = adapter.plan(context)
-    _validate_jobs(jobs)
+    plan_path = metadata_path(defn) / "plan.json"
+    try:
+        jobs = adapter.plan(context)
+        _validate_jobs(jobs)
+    except Exception:
+        plan_path.unlink(missing_ok=True)
+        raise
 
     plan = {
-        "schema_version": 1,
+        "schema_version": 2,
         "generated_at": _now(),
         "context_prepared_at": context["prepared_at"],
         "jobs": [job.to_dict() for job in jobs],
@@ -122,6 +128,8 @@ def load_plan(defn: dict[str, Any]) -> dict[str, Any]:
     if not path.exists():
         raise RuntimeError("plan not created; run 'mockingbird plan' first")
     plan = read_json(path)
+    if plan.get("schema_version") != 2:
+        raise RuntimeError("plan schema is obsolete; run mockingbird plan again")
     context = load_context(defn)
     if plan.get("context_prepared_at") != context.get("prepared_at"):
         raise RuntimeError("plan is stale for the current context; run 'mockingbird setup' and 'mockingbird plan'")
@@ -162,7 +170,7 @@ def run(
     write_json(run_dir / "context.json", context)
     write_json(run_dir / "plan.json", plan)
     run_record = {
-        "schema_version": 1,
+        "schema_version": 2,
         "run_id": run_id,
         "name": context["name"],
         "status": "RUNNING",
@@ -185,15 +193,34 @@ def run(
     scheduler = context["scheduler"]
     started = time.monotonic()
 
+    completed: dict[str, JobExecution] = {}
+    evidence_lock = Lock()
+    write_json(run_dir / "executions.json", [])
+
     def execute(job: Job) -> JobExecution:
         execution_context = execution_contexts[job.id]
-        result = adapter.execute(context, job, execution_context)
-        if result.job_id != job.id:
-            raise ValueError(
-                f"adapter returned execution for {result.job_id!r}; expected {job.id!r}"
-            )
+        job_started = _now()
+        began = time.monotonic()
+        error = None
+        try:
+            result = adapter.execute(context, job, execution_context)
+            if result.job_id != job.id:
+                raise ValueError(f"adapter returned execution for {result.job_id!r}; expected {job.id!r}")
+            json.dumps(result.to_dict(), allow_nan=False)
+        except Exception as exc:
+            error = exc
+            result = JobExecution(job.id, job_started, _now(), time.monotonic() - began,
+                                  observation={"executor_error": f"{type(exc).__name__}: {exc}"})
         result.paths = execution_context.evidence_paths()
-        json.dumps(result.to_dict())
+        result.contract = job.to_dict()
+        result.run_id = run_id
+        # Persist each returned execution before the scheduler consumes it.
+        write_json(Path(execution_context.job_dir) / "execution.json", result.to_dict())
+        with evidence_lock:
+            completed[job.id] = result
+            write_json(run_dir / "executions.json", [completed[j.id].to_dict() for j in selected if j.id in completed])
+        if error is not None:
+            raise error
         return result
 
     try:
@@ -274,53 +301,102 @@ def collect(
     defn: dict[str, Any], run_dir: str | Path | None = None
 ) -> tuple[dict[str, Any], Path]:
     run_path = _resolve_run_dir(defn, run_dir)
+    with collection_lock(run_path):
+        return _collect_locked(defn, run_path)
+
+
+def _collect_locked(defn, run_path):
     context = read_json(run_path / "context.json")
     run_record = read_json(run_path / "run.json")
-    if run_record.get("status") not in {"EXECUTED", "COLLECTED"}:
-        raise RuntimeError(
-            f"run is not collectable; status={run_record.get('status')!r}: {run_path}"
-        )
+    if run_record.get("status") not in {"EXECUTED", "COLLECTED", "ERROR"}:
+        raise RuntimeError(f"run is not collectable; status={run_record.get('status')!r}: {run_path}")
+    if run_record.get("schema_version") != 2:
+        raise RuntimeError("run schema is obsolete; use the previous version to collect this run")
+    executions = [JobExecution(**item) for item in read_json(run_path / "executions.json")]
+    by_id = {item.job_id: item for item in executions}
+    selected = run_record["selection"]["selected_ids"]
+    if len(by_id) != len(executions) or not set(by_id).issubset(selected):
+        raise ValueError("execution IDs do not match the run")
+    if any(item.run_id != run_record["run_id"] for item in executions):
+        raise ValueError("execution belongs to another run")
 
-    executions_path = run_path / "executions.json"
-    if not executions_path.exists():
-        raise RuntimeError(f"execution evidence not found: {executions_path}")
-
+    journal_path = run_path / "collection.json"
+    if journal_path.exists():
+        journal = read_json(journal_path)
+        if journal["run_id"] != run_record["run_id"] or set(journal["jobs"]) != set(selected):
+            raise ValueError("collection journal does not match the run")
+    else:
+        journal = {"schema_version": 2, "run_id": run_record["run_id"], "jobs": {
+            job_id: {"state": "UNCOLLECTED", "attempts": 0} for job_id in selected
+        }}
     adapter = load_adapter(str(context["execution"]["adapter"]))
-    raw_executions = read_json(executions_path)
-    executions = [JobExecution(**item) for item in raw_executions]
-    tests = _validate_results(executions, adapter.collect(context, executions))
+    for job_id in selected:
+        entry = journal["jobs"][job_id]
+        if entry["state"] == "COMPLETE" or job_id not in by_id:
+            continue
+        execution = by_id[job_id]
+        attempts = entry["attempts"] + 1
+        try:
+            outcomes = adapter.collect(context, [execution])
+            if len(outcomes) != 1 or outcomes[0].id != job_id:
+                raise ValueError("collector must return exactly one outcome for the requested Job ID")
+            outcome = outcomes[0]
+            if isinstance(outcome, TestResult):
+                _validate_results([execution], [outcome])
+                entry = {"state": "COMPLETE", "result": outcome.to_dict()}
+            elif isinstance(outcome, CollectionAttempt):
+                if outcome.state not in {"PENDING", "ERROR"}:
+                    raise ValueError("invalid collection state")
+                if not isinstance(outcome.artifacts, list) or any(not isinstance(v, str) for v in outcome.artifacts):
+                    raise ValueError("collection artifacts must be list[str]")
+                if outcome.reason is not None and not isinstance(outcome.reason, str):
+                    raise ValueError("collection reason must be a string or null")
+                entry = outcome.to_dict()
+            else:
+                raise ValueError("collector returned an invalid outcome type")
+            json.dumps(entry, allow_nan=False)
+        except Exception as exc:
+            entry = {"state": "ERROR", "reason": f"{type(exc).__name__}: {exc}"}
+        entry.update(attempts=attempts, updated_at=_now())
+        journal["jobs"][job_id] = entry
+        # This is the authoritative checkpoint, including final results.
+        write_json(journal_path, journal)
+    if not journal_path.exists():
+        write_json(journal_path, journal)
 
-    counts = {
-        status: sum(test.status == status for test in tests)
-        for status in ("PASS", "FAIL", "ERROR", "SKIP")
-    }
+    tests = [TestResult(**journal["jobs"][job_id]["result"]) for job_id in selected
+             if journal["jobs"][job_id]["state"] == "COMPLETE"]
+    _validate_results([by_id[test.id] for test in tests], tests)
+    counts = {status: sum(test.status == status for test in tests) for status in _CANONICAL_STATUSES}
+    states = [journal["jobs"][job_id]["state"] for job_id in selected]
+    complete = len(tests) == len(selected)
     result = {
-        "schema_version": 1,
+        "schema_version": 2,
         "run_id": run_record["run_id"],
         "name": context["name"],
         "generated_at": _now(),
         "started_at": run_record.get("started_at"),
         "finished_at": run_record.get("finished_at"),
         "duration_s": run_record.get("duration_s"),
-        "status": "PASS" if counts["FAIL"] == counts["ERROR"] == 0 else "FAIL",
+        "status": ("PASS" if counts["FAIL"] == counts["ERROR"] == 0 else "FAIL") if complete else "PENDING",
+        "collection_complete": complete,
         "summary": {
-            "total": len(tests),
-            "pass": counts["PASS"],
-            "fail": counts["FAIL"],
-            "error": counts["ERROR"],
-            "skip": counts["SKIP"],
+            "total": len(selected),
+            "pass": counts["PASS"], "fail": counts["FAIL"],
+            "error": counts["ERROR"], "skip": counts["SKIP"],
+            "pending": states.count("PENDING"),
+            "uncollected": states.count("UNCOLLECTED"),
+            "collection_error": states.count("ERROR"),
         },
         "tests": [test.to_dict() for test in tests],
+        "collection": journal["jobs"],
     }
     write_json(run_path / "result.json", result)
-
-    run_record["status"] = "COLLECTED"
+    # Execution status is preserved independently of collection status.
+    run_record["collection_status"] = "COMPLETE" if complete else "PENDING"
     run_record["collected_at"] = result["generated_at"]
     run_record["result_status"] = result["status"]
     write_json(run_path / "run.json", run_record)
-    write_json(
-        metadata_path(defn) / "last_result.json",
-        {"result": str((run_path / "result.json").resolve())},
-    )
+    write_json(metadata_path(defn) / "last_result.json", {"result": str((run_path / "result.json").resolve())})
     update_state(defn, last_result=str((run_path / "result.json").resolve()))
     return result, run_path

@@ -95,7 +95,7 @@ def test_execution_command_shorthand_normalizes_to_builtin_adapter(tmp_path, mon
                     "command": ["./run.sh"],
                     "timeout_s": 60,
                     "jobs": ["a"],
-                    "collect": {"mode": "exit-code"},
+                    "collect": {"mode": "no-check"},
                 },
                 "scheduler": {
                     "capacity_provider": "fixed",
@@ -134,3 +134,4 @@ def test_execution_rejects_ambiguous_adapter_and_top_level_command(tmp_path, mon
 
     with pytest.raises(ValueError, match="both adapter"):
         validate_definition(load_definition(definition_path))
+

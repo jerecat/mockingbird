@@ -60,3 +60,7 @@ resident monitoring process.
 
 Asynchronous users normally separate run and collect rather than using all
 unless their collector is valid immediately after submission.
+
+
+Collection and Job declaration decisions are superseded by ADR 0008. The capacity
+gate and bounded one-command hand-off decisions remain in force.

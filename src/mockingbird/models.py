@@ -63,6 +63,9 @@ class JobExecution:
     observation: Any = None
     paths: dict[str, str] = field(default_factory=dict)
 
+    contract: dict[str, Any] = field(default_factory=dict)
+    run_id: str = ""
+
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
@@ -87,6 +90,19 @@ class CheckResult:
     status: str
     message: str
     details: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class CollectionAttempt:
+    """Unresolved collection state, deliberately separate from TestResult."""
+
+    id: str
+    state: str  # PENDING or ERROR; neither is a final test judgement.
+    reason: str | None = None
+    artifacts: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

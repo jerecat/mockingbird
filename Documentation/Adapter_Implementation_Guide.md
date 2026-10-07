@@ -293,3 +293,29 @@ mockingbird doctor regression.yaml
 
 and add project-side tests using `mockingbird.testing`. See
 `Adapter_Conformance_Testing.md`.
+
+
+## Repeatable collection contract (schema 2)
+
+Core calls collect with one unresolved execution at a time, in selected order.
+Return exactly one matching TestResult or CollectionAttempt:
+
+```python
+from mockingbird.models import CollectionAttempt, TestResult
+
+# Not available yet; no final TestResult exists.
+CollectionAttempt(execution.job_id, "PENDING", reason="not ready")
+# Collection failed; retry in a later cycle.
+CollectionAttempt(execution.job_id, "ERROR", reason="service unavailable")
+# A final project judgement; this is never recollected.
+TestResult(execution.job_id, "ERROR", reason="project-defined terminal error")
+```
+
+Exceptions, malformed outcomes, and ID mismatches become collection errors.
+Completed results survive later collect calls. Collectors must tolerate retries.
+Core attaches the frozen Job to execution.contract and the run identity to
+execution.run_id. These are JSON-serializable evidence, not scheduler semantics.
+The declarative adapter uses the saved contract and MB_JOB_ID/MB_RUN_ID external
+protocol; custom adapters remain free to interpret their own opaque payloads.
+Old examples returning final TestResult are still valid. Final result interpretation
+is the adapter author's explicit policy, never the generic executor's policy.

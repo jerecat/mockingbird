@@ -71,7 +71,7 @@ execution:
   timeout_s: 5
   jobs: [smoke]
   collect:
-    mode: exit-code
+    mode: no-check
 scheduler:
   capacity_provider: fixed
   max_parallel: 1
@@ -91,3 +91,4 @@ scheduler:
         for item in checks
     )
     assert not (tmp_path / "work" / ".reg" / "context.json").exists()
+

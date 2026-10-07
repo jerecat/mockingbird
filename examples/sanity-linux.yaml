@@ -5,15 +5,17 @@ sources: []
 
 # Normal integration path: declare the command contract only.
 execution:
-  command: ["./examples/sanity-run.sh"]
-  timeout_s: 30
+  defaults:
+    command: ["./examples/sanity-run.sh"]
+    timeout_s: 30
+    collect:
+      command: ["sh", "./examples/sanity-collect.sh"]
+      timeout_s: 5
   jobs:
     - pwd
     - list_directory
     - make_directory
     - remove_directory
-  collect:
-    mode: exit-code
 
 scheduler:
   capacity_provider: fixed
@@ -21,3 +23,4 @@ scheduler:
   poll_interval_s: 0.1
   config:
     slots: 2
+

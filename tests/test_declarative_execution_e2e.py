@@ -75,8 +75,12 @@ def test_declarative_contract_runs_without_project_python(tmp_path, monkeypatch)
         "fail": 1,
         "error": 0,
         "skip": 0,
+        "pending": 0,
+        "uncollected": 0,
+        "collection_error": 0,
     }
     assert [item["artifacts"] for item in result["tests"]] == [
         ["artifact://pass"],
         ["artifact://fail"],
     ]
+

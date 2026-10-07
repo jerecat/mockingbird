@@ -98,9 +98,11 @@ def test_architecture_documentation_and_adrs_are_part_of_the_repository_contract
             "0005-execution-context-and-process-io.md",
             "0006-doctor-and-conformance-kit.md",
             "0007-declarative-execution-and-bounded-handoff.md",
+            "0008-resolved-jobs-and-repeatable-collection.md",
         )],
     ]
     missing = [str(path.relative_to(root)) for path in required if not path.is_file()]
     assert not missing, f"architecture documentation is missing: {missing}"
+
 
 

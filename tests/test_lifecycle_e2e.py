@@ -64,6 +64,9 @@ def test_context_plan_run_result_evidence_chain_and_failed_rerun(tmp_path, monke
         "fail": 1,
         "error": 0,
         "skip": 0,
+        "pending": 0,
+        "uncollected": 0,
+        "collection_error": 0,
     }
     assert first_result["duration_s"] is not None
     for test in first_result["tests"]:
@@ -95,3 +98,4 @@ def test_reprepare_invalidates_old_plan(tmp_path, monkeypatch):
     prepare(defn)
     with pytest.raises(RuntimeError, match="stale"):
         lifecycle.preview(defn, Selection())
+

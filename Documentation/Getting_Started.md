@@ -64,6 +64,7 @@ runs/<run-id>/context.json
 runs/<run-id>/plan.json
 runs/<run-id>/run.json
 runs/<run-id>/executions.json
+runs/<run-id>/collection.json
 runs/<run-id>/result.json
 runs/<run-id>/jobs/<job>/
   work/
@@ -107,12 +108,14 @@ Start with the declarative contract. No project Python is required:
         - test_a
         - test_b
       collect:
-        mode: exit-code
+        mode: no-check
 
-For a submit-and-return flow, replace exit-code collection with one shared
-project collector command.
+no-check does not verify command success. For checked results, supply a project
+collector command in defaults or per Job. Repeated collect visits only unresolved
+Jobs; it does not execute them again.
 
 Read `Execution_Contract.md` first, then `Integration_Guide.md`.
 
 Only read the adapter implementation/conformance guides when the declarative
 boundary is genuinely insufficient and a custom Python adapter is needed.
+

@@ -66,7 +66,7 @@ The execution helper verifies:
 - Jobs are JSON serializable;
 - sample `execute()` returns the same Job ID;
 - `JobExecution` is JSON serializable;
-- sample `collect()` returns one matching canonical result;
+- sample `collect()` returns one matching final TestResult or unresolved CollectionAttempt;
 - collected status is PASS/FAIL/ERROR/SKIP;
 - collected artifacts are an opaque `list[str]`.
 
@@ -101,3 +101,4 @@ This samples capacity more than once and verifies a non-negative integer result.
 `doctor` answers "can I connect from this machine now?". The conformance test kit
 answers "does my implementation obey the integration contract?". Both are needed:
 one is runtime/environment health; the other is adapter architecture/API health.
+

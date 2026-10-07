@@ -50,7 +50,7 @@ def test_context_plan_run_result_and_failed_rerun(monkeypatch, tmp_path: Path):
     assert Path(context["paths"]["workspace"]) == tmp_path / "work"
     assert [item["id"] for item in plan["jobs"]] == ["passing", "failing", "another"]
     assert len(executions) == 3
-    assert result["summary"] == {"total": 3, "pass": 2, "fail": 1, "error": 0, "skip": 0}
+    assert result["summary"] == {"total": 3, "pass": 2, "fail": 1, "error": 0, "skip": 0, "pending": 0, "uncollected": 0, "collection_error": 0}
 
     for evidence in ("context.json", "plan.json", "run.json", "executions.json", "result.json"):
         assert (first_run / evidence).is_file()
@@ -63,6 +63,7 @@ def test_context_plan_run_result_and_failed_rerun(monkeypatch, tmp_path: Path):
 
     assert selection["selected_ids"] == ["failing"]
     assert selection["failed_from"] == str(previous_result.resolve())
-    assert second_result["summary"] == {"total": 1, "pass": 0, "fail": 1, "error": 0, "skip": 0}
+    assert second_result["summary"] == {"total": 1, "pass": 0, "fail": 1, "error": 0, "skip": 0, "pending": 0, "uncollected": 0, "collection_error": 0}
     run_record = json.loads((second_run / "run.json").read_text())
     assert run_record["selection"]["failed_from"] == str(previous_result.resolve())
+

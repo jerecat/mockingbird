@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
-from .models import CheckResult, ExecutionContext, Job, JobExecution, TestResult
+from .models import CollectionAttempt, CheckResult, ExecutionContext, Job, JobExecution, TestResult
 
 
 class ExecutionAdapter(ABC):
@@ -37,7 +37,7 @@ class ExecutionAdapter(ABC):
     @abstractmethod
     def collect(
         self, context: dict[str, Any], executions: list[JobExecution]
-    ) -> list[TestResult]: ...
+    ) -> list[TestResult | CollectionAttempt]: ...
 
 
 class CapacityProvider(ABC):
@@ -91,3 +91,4 @@ class SourceProvider(ABC):
     def materialize(
         self, source: dict[str, Any], destination: Path
     ) -> dict[str, Any]: ...
+

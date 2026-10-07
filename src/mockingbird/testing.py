@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from .contracts import CapacityProvider, ExecutionAdapter, SourceProvider
-from .models import CheckResult, ExecutionContext, JobExecution
+from .models import CollectionAttempt, CheckResult, ExecutionContext, JobExecution
 
 
 _CANONICAL_STATUSES = {"PASS", "FAIL", "ERROR", "SKIP"}
@@ -107,6 +107,13 @@ def check_execution_adapter(
             results = adapter.collect(context, [captured])
             if len(results) != 1 or results[0].id != sample.id:
                 raise AssertionError("collect must return exactly one result for the sample execution")
+            if isinstance(results[0], CollectionAttempt):
+                if results[0].state not in {"PENDING", "ERROR"}:
+                    raise AssertionError("invalid collection state")
+                if not isinstance(results[0].artifacts, list) or any(not isinstance(v, str) for v in results[0].artifacts):
+                    raise AssertionError("artifacts must be list[str]")
+                _assert_json(results[0].to_dict())
+                return "sample collect returned unresolved state", {"state": results[0].state}
             status = str(results[0].status).upper()
             if status not in _CANONICAL_STATUSES:
                 raise AssertionError(f"non-canonical status: {status!r}")
@@ -162,3 +169,4 @@ def assert_conformance(checks: list[CheckResult]) -> None:
     if failures:
         details = "; ".join(f"{item.component}/{item.name}: {item.message}" for item in failures)
         raise AssertionError(details)
+

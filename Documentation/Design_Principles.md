@@ -236,3 +236,12 @@ For a normal Job, Mockingbird should behave like a careful human at a terminal:
 Mockingbird does not turn compile, submission, monitoring, or simulator behavior
 into another orchestration framework. If a project command hands work to an
 external system, that external work remains project/system owned.
+
+
+## Principle 10: Shorthand does not weaken the contract
+
+Users can declare every field for every Job. Defaults reduce repetition, not
+responsibility: plan resolves and validates a complete contract for each Job.
+Execution evidence says what the executor did. The collector decides the result.
+No-check deliberately performs no judgement; a pending collection has no final
+result yet. All three remain associated by Job ID inside one run.

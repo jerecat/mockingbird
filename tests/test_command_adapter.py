@@ -43,7 +43,7 @@ def test_string_job_runs_exactly_one_project_command_with_job_id(tmp_path):
                 "command": ["./run.sh"],
                 "timeout_s": 5,
                 "jobs": ["job-a"],
-                "collect": {"mode": "exit-code"},
+                "collect": {"mode": "no-check"},
             },
         },
     }
@@ -84,7 +84,7 @@ def test_mapping_job_can_override_arguments_and_timeout(tmp_path):
                         "timeout_s": 7,
                     }
                 ],
-                "collect": {"mode": "exit-code"},
+                "collect": {"mode": "no-check"},
             },
         },
     }
@@ -151,7 +151,7 @@ def test_probe_requires_finite_execution_timeout(tmp_path):
             "config": {
                 "command": ["./run.sh"],
                 "jobs": ["job-a"],
-                "collect": {"mode": "exit-code"},
+                "collect": {"mode": "no-check"},
             },
         },
     }
@@ -159,7 +159,7 @@ def test_probe_requires_finite_execution_timeout(tmp_path):
     checks = Adapter().probe(context)
 
     assert any(
-        item.status == "FAIL" and "execution.timeout_s is required" in item.message
+        item.status == "FAIL" and "timeout_s is required" in item.message
         for item in checks
     )
 
@@ -173,8 +173,8 @@ def test_probe_reports_missing_project_command(tmp_path):
             "config": {
                 "command": ["./missing.sh"],
                 "timeout_s": 5,
-                "jobs": [],
-                "collect": {"mode": "exit-code"},
+                "jobs": ["missing"],
+                "collect": {"mode": "no-check"},
             },
         },
     }
@@ -184,7 +184,7 @@ def test_probe_reports_missing_project_command(tmp_path):
     assert any(item.status == "FAIL" and "command not found" in item.message for item in checks)
 
 
-def test_execution_timeout_returns_error_and_releases_local_process(tmp_path):
+def test_execution_timeout_is_evidence_and_no_check_still_passes(tmp_path):
     script = tmp_path / "run.sh"
     script.write_text("#!/bin/sh\nsleep 10\n")
     script.chmod(0o755)
@@ -198,7 +198,7 @@ def test_execution_timeout_returns_error_and_releases_local_process(tmp_path):
                 "command": ["./run.sh"],
                 "timeout_s": 0.05,
                 "jobs": ["job-a"],
-                "collect": {"mode": "exit-code"},
+                "collect": {"mode": "no-check"},
             },
         },
     }
@@ -211,4 +211,5 @@ def test_execution_timeout_returns_error_and_releases_local_process(tmp_path):
 
     assert execution.observation["timed_out"] is True
     result = adapter.collect(context, [execution])[0]
-    assert result.status == "ERROR"
+    assert result.status == "PASS"
+

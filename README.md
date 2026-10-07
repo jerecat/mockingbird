@@ -64,12 +64,14 @@ execution:
     - test_a
     - test_b
   collect:
-    mode: exit-code
+    mode: no-check
 ```
 
-A string Job runs as `./run.sh <job-id>`. A mapping can override argv and
-timeout. For submit-and-return systems, configure one shared collector command
-instead of exit-code collection.
+A string Job runs as `./run.sh <job-id>`. Defaults are expanded and validated
+by plan; each Job can override command, args, timeout, and collect. no-check is
+also the implicit default and does not verify success. Configure a project-owned
+collector when result judgement is needed. Repeated collect retries only
+unresolved Jobs in the same run.
 
 See `Documentation/Execution_Contract.md`.
 
@@ -263,7 +265,7 @@ ExecutionAdapter:
   setup(context)
   plan(context) -> list[Job]
   execute(context, job, execution_context) -> JobExecution
-  collect(context, executions) -> list[TestResult]
+  collect(context, executions) -> list[TestResult | CollectionAttempt]
 
 SourceProvider:
   probe(source)
@@ -294,3 +296,4 @@ Start here:
 - `Documentation/Integration_Guide.md`
 - `Documentation/Demos.md`
 - `Documentation/ADR/`
+

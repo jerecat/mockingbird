@@ -1,143 +1,177 @@
 # Declarative Execution Contract
 
-This is the normal project-facing execution interface.
+The external boundary is a contract. Mockingbird does not understand compile,
+sleep, simulation, cleanup, artifact locations, or external scheduler IDs.
+Each is an ordinary Job. Jobs are dispatched in list order through the capacity
+gate. There are no dependencies or before/after phases. Parallel completion
+order is not guaranteed; use max_parallel: 1 for serial local command execution.
+A returning submit command does not imply external work has completed.
 
-The goal is simple:
+## Plan: resolve, validate, freeze
 
-> If a project can already be run from the command line, integrating it with
-> Mockingbird should not require Python.
-
-## Smallest useful contract
-
-    execution:
-      command: ["./run.sh"]
-      timeout_s: 600
-      jobs:
-        - test_a
-        - test_b
-      collect:
-        mode: exit-code
-
-For each string Job entry, Mockingbird runs exactly one project command:
-
-    ./run.sh test_a
-    ./run.sh test_b
-
-The command runs from the directory where Mockingbird was invoked. stdout and
-stderr go to the Job's Mockingbird log files.
-
-timeout_s is required. It is the maximum time Mockingbird may keep the local
-project command. This value is project policy; Mockingbird does not invent one.
-
-## Job-specific argv
-
-Use a mapping when the Job does not use the simple command + Job ID form:
-
-    execution:
-      command: ["./run.sh"]
-      timeout_s: 600
-      jobs:
-        - id: pcie_dma_001
-          args: ["--test", "dma_write"]
-        - id: long_compile
-          args: ["--test", "compile_heavy"]
-          timeout_s: 1800
-      collect:
-        mode: exit-code
-
-The Job ID remains Mockingbird's only canonical identity. args are opaque project
-arguments.
-
-## Result collection
-
-Collection is explicit. Choose one form.
-
-### Synchronous command: exit-code
-
-    collect:
-      mode: exit-code
-
-This declares that the project command's exit code is the result:
-
-    0       PASS
-    nonzero FAIL
-    timeout ERROR
-
-This mode is suitable when the command itself finishes the test.
-
-### Project-owned collector command
-
-For submit-and-return flows, use a project collector:
-
+```yaml
+execution:
+  defaults:
+    command: ["./run.sh"]
+    timeout_s: 600
     collect:
       command: ["./collect.sh"]
       timeout_s: 30
+  jobs:
+    - test_a
+    - test_b
+    - id: pause
+      command: ["sleep"]
+      args: ["3"]
+      collect:
+        mode: no-check
+```
 
-Mockingbird calls the same collector once for each executed Job and appends the
-Mockingbird Job ID:
+`mb plan` applies defaults, overwrites explicitly specified fields with Job
+values, validates every resolved contract, and writes plan.json only on success.
+A failed plan validation removes the old plan so it cannot accidentally run.
+No project command is executed by plan. `doctor` checks command availability;
+`dry-run` previews selection from an already validated plan.
 
-    ./collect.sh pcie_dma_001
+Every Job can specify all its fields. Defaults only remove repetitive writing:
+500 Jobs still become 500 complete contracts in plan.json.
 
-stdout must contain exactly one JSON object:
+The resolved payload contains command, args, timeout_s, and collect. Execution
+and collection use this payload, never reapply defaults. Core treats it as opaque.
 
-    {
-      "status": "FAIL",
-      "artifacts": [
-        "artifact://pcie_dma_001/sim.log"
-      ]
-    }
+Rules:
 
-status is PASS, FAIL, ERROR, or SKIP. artifacts is an optional list of opaque
-string references. Optional reason and metadata fields are also accepted.
+- Job fields overwrite defaults by field; arrays and collect mappings are
+  replaced as a whole, with no concatenation or recursive merge.
+- Explicit args: [] means no arguments. Null is not an omission and is rejected.
+- Without args in either place, args becomes [job_id], including for string Jobs.
+- A collector command has its own args; absent collector args becomes [job_id].
+- Without collect in either place, collect becomes {mode: no-check}.
+- command must be a non-empty argv list. args is a string list, possibly empty.
+- Execution and collector-command timeout_s must be finite positive numbers.
+- Unknown keys in the declarative execution/default/Job/collect contract, invalid
+  types, missing required values, and duplicate/invalid Job IDs fail plan.
+- Optional Job metadata is opaque and must be a JSON-serializable mapping.
 
-Collector stderr is available for diagnostics. Collector timeout, non-zero exit,
-invalid JSON, or an invalid status becomes ERROR.
+Common command/args/timeout_s/collect fields at execution level remain supported
+as shorthand defaults. Do not define the same default both there and under
+execution.defaults. New definitions should use defaults.
 
-The collector may internally use one default judgement rule and a small
-exception table. Mockingbird does not know or interpret that routing.
+## Execution evidence is not a test result
 
-## Submit-and-return compute-center use
+One permitted Job invokes exactly one project command with command + args.
+The command runs from the invocation directory saved in context.json.
+stdout/stderr are streamed to per-Job log files. The finite local timeout releases
+local execution resources; MB does not follow handed-off external work.
 
-The executor does not stay resident to follow the external Job:
+The adapter records returncode, timed_out, or launch_error as execution evidence.
+These do not automatically become TestResult. Every returned execution is saved
+immediately in jobs/<job>/execution.json and in the run's executions.json snapshot.
+An executor/plugin exception is recorded too; it may stop further dispatch.
+Already saved records survive that error. Unexecuted Jobs remain uncollected.
 
-    Mockingbird
-        |
-        +-- ./run.sh test_a
-                |
-                +-- compile
-                +-- submit
-                +-- return
-        |
-        +-- local execute complete
+The generic built-in exit-code collection mode has been removed. If an integration
+wants a result based on an exit code, its project-owned collector must explicitly
+implement that policy. The demo Python adapters demonstrate project-selected
+judgement rules; they are not the generic declarative executor.
 
-The external scheduler owns the submitted work after hand-off. Mockingbird does
-not require or record its scheduler Job ID.
+## External identity and arguments
 
-For this flow, normally run:
+Within a run, the contract, execution evidence, and final result are linked 1:1
+by Job ID. Across runs the identity is (run_id, job_id).
 
-    mb run regression.yaml
-    # wait/check through the project's normal mechanism
-    mb collect regression.yaml --run-dir runs/<chosen-run>
+Both execution and collector commands receive these environment variables:
 
-Do not use mb all unless the configured collector is valid immediately after the
-project command returns.
+| Variable | Meaning |
+| --- | --- |
+| MB_JOB_ID | This Mockingbird Job ID |
+| MB_RUN_ID | This invocation's run ID |
 
-## Capacity
+The resolved args lists are passed literally: no shell expansion, placeholders,
+or hidden extra arguments. Default collector args contains the Job ID, so a
+collector normally runs as ./collect.sh test_a. Specify args: [] to use only the
+environment, or supply another explicit argument list.
 
-Mockingbird dispatches only through the configured capacity gate:
+Project commands can use the identity to link their own logs or external work.
+MB does not impose an external directory layout or interpret scheduler IDs.
+Internal ExecutionContext paths remain an adapter implementation interface.
 
-    effective limit = min(max_parallel, available_slots())
+## Collection protocol
 
-If the gate is full, no new project command starts. Existing work is not killed
-when capacity later drops.
+A collector command must exit zero and print one JSON object:
 
-For an external asynchronous scheduler, its CapacityProvider must account for
-already submitted work in later samples. Mockingbird deliberately does not
-become the scheduler.
+```json
+{"status":"PASS","artifacts":["artifact://project-owned-reference"]}
+```
 
-## Advanced escape hatch
+Final statuses: PASS, FAIL, ERROR, SKIP. artifacts defaults to [] and is an opaque
+list of strings. Optional reason (string/null) and metadata (mapping) are accepted.
+Optional id must match the requested Job ID. Without id, the adapter attaches it.
 
-When this small contract is genuinely insufficient, an external Python
-ExecutionAdapter remains supported.
+When the external result is not ready:
 
-That is the exception path. It is not the normal onboarding path.
+```json
+{"status":"PENDING","reason":"result not available yet"}
+```
+
+PENDING is a collection state, not a TestResult. No final test result is created.
+A collector timeout, nonzero exit, invalid output, ID mismatch, or adapter exception
+is also unresolved: collection state ERROR. It is retried in the next cycle.
+A valid JSON response with status ERROR, on the other hand, is the project's
+**final test judgement** and is not retried.
+
+### no-check
+
+The built-in no-check collector returns PASS with artifacts: [] during collect.
+It does not inspect execution evidence, even if the command failed to launch or
+timed out. This means "no result check requested", not "verified successful".
+The plan preserves that choice explicitly; all execution evidence is still saved.
+
+## Repeated collect cycles on one run
+
+```sh
+mb run regression.yaml
+mb collect regression.yaml --run-dir runs/<chosen-run>
+# Later, repeat exactly the same collect command.
+```
+
+Each collect call performs one sweep, in selected Job order:
+
+- UNCOLLECTED execution: invoke its collector.
+- PENDING or collection ERROR: invoke its collector again.
+- COMPLETE: retain the final result without invoking its collector.
+- No execution record: leave UNCOLLECTED; do not invent a result.
+
+No executor is rerun. No resident polling loop or background monitor is added.
+all performs one execution cycle followed by one collection sweep.
+
+collection.json is the authoritative per-Job checkpoint, saved atomically after
+each attempt. Final results survive an interrupted collect; the next collect
+rebuilds result.json from that checkpoint. Collector logs use unique names per
+attempt. Concurrent collect calls for the same run are rejected using a file lock.
+A crash after an external collector runs but before its checkpoint is written can
+repeat that call; project collectors should therefore be safe to call again.
+
+result.json contains only final judgements in tests, with separate collection
+states. Its summary counts pass/fail/error/skip plus pending, uncollected, and
+collection_error; total always refers to the selected set. Until every Job has a
+final result, aggregate status is PENDING, even if some final FAILs already exist.
+Once complete, aggregate status is FAIL if any final FAIL/ERROR exists, else PASS.
+run.json preserves execution status separately from collection_status.
+
+CLI collect/all exit codes: 0 = complete PASS, 1 = complete FAIL, 2 = incomplete
+collection. Detailed pending/error state is in result.json and collection.json.
+
+## Capacity and migration
+
+The hard dispatch gate remains min(max_parallel, available_slots()), reserving
+locally in-flight executions. Asynchronous capacity providers must account for
+already handed-off external work. Existing work is not killed when capacity falls.
+
+Plan, run, collection, and result evidence use schema version 2. Old plans must
+be regenerated. Old runs are not silently reinterpreted; collect them using the
+version that created them. Replace old collect.mode: exit-code with an explicit
+project collector, or choose no-check if result judgement is not required.
+
+Custom Python ExecutionAdapter remains an advanced escape hatch. See
+Adapter_Implementation_Guide.md for TestResult versus CollectionAttempt.

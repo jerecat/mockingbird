@@ -170,7 +170,7 @@ def main() -> None:
         print(_summary(result))
         print(f"run: {run_dir}")
         if result["status"] != "PASS":
-            raise SystemExit(1)
+            raise SystemExit(2 if result["status"] == "PENDING" else 1)
         return
 
     if args.command == "status":
@@ -193,7 +193,7 @@ def main() -> None:
         print(_summary(result))
         print(f"run: {run_dir}")
         if result["status"] != "PASS":
-            raise SystemExit(1)
+            raise SystemExit(2 if result["status"] == "PENDING" else 1)
         return
 
     parser.error(f"unsupported command: {args.command}")
@@ -201,3 +201,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

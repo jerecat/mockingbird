@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Resolve defaults and per-Job overrides into complete validated plan contracts.
+- Support per-Job command/collector, empty arguments, and implicit no-check.
+- Remove generic exit-code judgement; preserve execution facts independently.
+- Persist each execution immediately and checkpoint each collection attempt.
+- Retry only unresolved collection states (PENDING or collection errors), with
+  immutable final results, run/Job identity, and one-run collection locking.
+- Add schema 2 evidence, separate incomplete summaries, and CLI exit 2 for pending.
+- Keep list-ordered, capacity-gated dispatch without dependency semantics.
+
+
 ## 0.5.0
 
 - Renamed the previous internal package/project name to `mockingbird`.
@@ -40,3 +52,4 @@
 - Added explicit `--failed-from` selection provenance.
 - Added editable selection files and ID-based selection.
 - Added generic capacity polling and max-parallel scheduling.
+
