@@ -58,6 +58,10 @@ and stop on genuine failures rather than continuing a misleading success tour.
    through `--debug`; do not disguise unexpected failures as success.
 2. Default to concise human output. Keep internal context/configuration JSON in
    saved files or explicit `--json` output. Do not leak progress into JSON stdout.
+   Summarise repeated successful diagnostics by user task. Keep implementation
+   names and executable paths in details, while retaining every failure/warning
+   and its cause in normal output. Say exactly what a passed check establishes:
+   finding an interpreter does not validate its script or mean a Job has passed.
 3. Align comparison columns. Keep long diagnostic details behind an explicit
    option. Include paths that let users find saved evidence.
 4. Show progress before slow phases and flush transitions. Avoid polling spam.
