@@ -1,0 +1,31 @@
+name: sample-collector
+workspace: ./work/sample-collector
+run_root: ./runs/sample-collector
+sources: []
+
+execution:
+  defaults:
+    command: [python3, examples/sample_run.py]
+    args: []
+    timeout_s: 30
+    collect:
+      command: [python3, examples/sample_collect.py]
+      args: []
+      timeout_s: 5
+  jobs:
+    - test_pass
+    - test_fail
+    - test_error
+    - test_skip
+    - test_pending
+    - test_collect_error
+    - test_bad_json
+    - id: test_no_check
+      collect:
+        mode: no-check
+
+scheduler:
+  capacity_provider: fixed
+  max_parallel: 1
+  config:
+    slots: 1

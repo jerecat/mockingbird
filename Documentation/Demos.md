@@ -1,5 +1,85 @@
 # Demos
 
+## Mock simv: run, collect, artifacts and recovery
+
+Step-by-step Japanese walkthrough: [模擬シミュレーション接続チュートリアル](Tutorial_Mock_Simulation.md).
+
+No simulator, licence, farm or source clone is required. These scripts create
+small text files as a stand-in for a user's simulation system. `wave.fsdb` is
+explicitly a text placeholder, NOT a valid waveform file for a waveform viewer.
+
+| Job | First collect | After external completion/recovery |
+| --- | --- | --- |
+| test_pass | PASS | retained |
+| test_fail | FAIL | retained |
+| test_error | final ERROR | retained, not retried |
+| test_skip | SKIP | retained |
+| test_pending | PENDING | PASS |
+| test_collect_error | collection error (exit 7) | PASS |
+| test_bad_json | collection error (invalid JSON) | PASS |
+| test_no_check | PASS without calling collector | retained |
+
+Run from the repository root with the installed virtual environment active:
+
+```bash
+mb prepare examples/sample-collector.yaml
+mb setup examples/sample-collector.yaml
+mb plan examples/sample-collector.yaml
+mb run examples/sample-collector.yaml
+mb collect examples/sample-collector.yaml
+mb status examples/sample-collector.yaml
+```
+
+First collect: total=8, pass=2, fail=1, error=1, skip=1, pending=1,
+uncollected=0, collection_error=2. Aggregate status is PENDING and collect exits 2.
+Run all commands individually; the nonzero collect exit is intentional.
+All mock execution commands return zero, including the Job with a FAIL verdict.
+
+- `examples/sample_run.py` writes `result.txt`, `tarmac.log`, `wave.fsdb`,
+  `sim.log` and (except for the pending case) a `done` marker. No JSON is written.
+- `examples/sample_collect.py` reads those files, decides the result and prints
+  one JSON object to stdout, including absolute artifact paths.
+- Mockingbird invokes the collector and stores its response in the run's result.
+  It does not copy or interpret the artifact files.
+
+The project-owned files live at `work/sample-results/<MB_RUN_ID>/<MB_JOB_ID>/`.
+The collector reads the plain-text verdict in `result.txt`. No completion marker
+means PENDING, even when files exist. A completed run with a missing or invalid
+verdict means final ERROR. A collector failure is a retryable collection error.
+
+Use the directory basename printed by `mb run` as the run ID below:
+
+```bash
+RUN_ID=20261007_140000_000000_sample-collector  # replace with your actual run ID
+ls "work/sample-results/$RUN_ID/test_pass"
+cat "work/sample-results/$RUN_ID/test_fail/result.txt"
+
+# Simulate the external system completing and its result service recovering.
+# This touches only project-owned sample files, never Mockingbird's records.
+python3 examples/sample_finish.py "$RUN_ID"
+mb collect examples/sample-collector.yaml --run-dir "runs/sample-collector/$RUN_ID"
+mb status examples/sample-collector.yaml --run-dir "runs/sample-collector/$RUN_ID"
+```
+
+Second collect: total=8, pass=5, fail=1, error=1, skip=1; all unresolved counts
+are zero. Collection is complete, aggregate status is FAIL, and collect exits 1.
+Only the three previously unresolved Jobs were retried. Each executed collector
+appends a line to its `collector_calls.txt`: final Jobs have one call, recovered
+Jobs have two, and no-check has no such file. A third collect makes no calls.
+Repeating collect does not rejudge final results after log edits. Start a new run
+to try another final verdict; each run uses its own project output directory.
+
+To inspect the collector's output directly, substitute the run ID printed by run:
+
+```bash
+MB_RUN_ID="$RUN_ID" MB_JOB_ID=test_pass python3 examples/sample_collect.py
+```
+
+Replace the sample directory convention, completion check and verdict parsing
+with your project's rules. Direct invocation also increments the demo call count.
+The JSON is created by this user-owned collector;
+the run-level `result.json` is created by Mockingbird.
+
 ## Direct Linux commands (serial)
 
 ```bash

@@ -165,6 +165,14 @@ See [ADR 0010](Documentation/ADR/0010-checkpoint-ownership-and-prepare-validity.
 
 ## Lifecycle
 
+日本語の手順付き体験セット:
+[模擬シミュレーション接続チュートリアル](Documentation/Tutorial_Mock_Simulation.md)。
+
+For an end-to-end user integration rehearsal without a simulator, see
+[Mock simv: run, collect, artifacts and recovery](Documentation/Demos.md#mock-simv-run-collect-artifacts-and-recovery).
+The `examples/sample-collector.yaml` sample creates mock result/log/wave files,
+exercises every final status, and demonstrates retrying pending/failed collection.
+
 Prepare acquires sources only when no checkout exists. Existing Git/SVN working
 trees are reused without updates or deletion, including local edits and build
 outputs. To change revisions, use Git/SVN yourself or choose a new workspace.
