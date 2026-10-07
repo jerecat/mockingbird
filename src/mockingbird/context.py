@@ -155,10 +155,16 @@ def prepare(defn: dict[str, Any]) -> dict[str, Any]:
     run_root = run_root_path(defn)
     sources_root = workspace / "sources"
     adapter_workdir = workspace / "exec"
+    execution = _normalize_execution(defn["execution"])
     metadata = workspace / ".reg"
 
-    for path in (workspace, sources_root, adapter_workdir, metadata, run_root):
+    for path in (workspace, sources_root, metadata, run_root):
         path.mkdir(parents=True, exist_ok=True)
+
+    # Custom adapters retain their prepared workspace contract. The command
+    # adapter runs from invocation_dir and has no use for an exec directory.
+    if execution["adapter"] != "command":
+        adapter_workdir.mkdir(parents=True, exist_ok=True)
 
     # Fail closed before touching mutable sources. A failed prepare must never
     # leave the previous plan executable against partially updated sources.
@@ -183,7 +189,6 @@ def prepare(defn: dict[str, Any]) -> dict[str, Any]:
             }
         )
 
-    execution = _normalize_execution(defn["execution"])
     scheduler = dict(defn["scheduler"])
     scheduler["max_parallel"] = int(scheduler.get("max_parallel", 1))
     scheduler["poll_interval_s"] = float(scheduler.get("poll_interval_s", 1.0))

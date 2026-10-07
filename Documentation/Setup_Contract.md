@@ -139,3 +139,9 @@ In a real project, this step could instead be an editor fix to the script or sou
 The retry starts from check_environment again and writes ready.txt on success.
 Both setup attempts remain available for comparison. Cleanup is manual; removing
 work/setup-demo also removes its attempt logs and any user edits there.
+
+The standard command adapter has no preparation of its own: its setup hook is
+a no-op, and prepare does not create workspace/exec for it. YAML setup Jobs
+remain available and keep their existing success/failure rules. Custom adapters
+retain their prepared adapter_workdir and setup hook contract. Existing exec
+directories are never removed automatically.

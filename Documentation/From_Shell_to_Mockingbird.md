@@ -207,7 +207,7 @@ CLI invocations also depends on where you invoke MB.
 | `worktrees/experiment/` | User-owned source worktree and scripts |
 | `worktrees/experiment/results/<run-id>/<job-id>/` | Results written by these example scripts |
 | `work/worktree-demo/.reg/` | MB's saved context, plan, state, and latest-run pointer |
-| `work/worktree-demo/exec/` | Adapter workspace; not the declarative command's automatic cwd |
+| `work/worktree-demo/exec/` | Custom adapter workspace; not created or used by the standard command adapter |
 | `runs/worktree-demo/<run-id>/` | MB execution records, collection records, and result.json |
 | `runs/worktree-demo/<run-id>/jobs/<safe-job-directory>/logs/` | Captured execution/collection stdout and stderr |
 

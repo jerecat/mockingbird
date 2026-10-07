@@ -108,7 +108,7 @@ class Adapter(ExecutionAdapter):
         return checks or [CheckResult("execution", "contract", "PASS", "valid empty plan")]
 
     def setup(self, context):
-        Path(context["paths"]["adapter_workdir"]).mkdir(parents=True, exist_ok=True)
+        """No adapter-owned preparation; optional YAML setup Jobs run in core."""
 
     def execute(self, context, job, execution: ExecutionContext):
         # Only the frozen Job payload supplies command, arguments and timeout.

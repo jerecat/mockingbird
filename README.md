@@ -172,8 +172,8 @@ python3 -m pytest -q --ignore=tests/test_cli_aliases.py
 ```
 
 This disables automatic loading of third-party pytest plugins and excludes two
-CLI registration tests that import Python 3.11's `tomllib`. The current expected
-result is **282 passed**. This was verified with Python 3.10.19, PyYAML 5.4.1 and
+CLI registration tests that import Python 3.11's `tomllib`. All collected tests should pass. This workaround was verified with
+Python 3.10.19, PyYAML 5.4.1 and
 pytest 8.4.2; pytest 9.0.3 has not yet been verified in this combination.
 
 Tests create temporary files in pytest's temporary directory, normally under
@@ -207,7 +207,7 @@ $PWD/
   regression.yaml
   work/
     sources/
-    exec/
+    exec/              # Created for custom adapters only
     .reg/
       context.json
       plan.json
