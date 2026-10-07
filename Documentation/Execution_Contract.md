@@ -118,7 +118,41 @@ environment, or supply another explicit argument list.
 
 Project commands can use the identity to link their own logs or external work.
 MB does not impose an external directory layout or interpret scheduler IDs.
-Internal ExecutionContext paths remain an adapter implementation interface.
+The command collector additionally receives these absolute paths, taken from
+the selected Job's saved execution, never from the latest run or current YAML:
+
+| Variable | Meaning |
+| --- | --- |
+| MB_EXECUTION_JSON | Per-Job execution.json location |
+| MB_STDOUT_PATH | Execution command stdout log location |
+| MB_STDERR_PATH | Execution command stderr log location |
+
+These variables are supplied when invoking a command collector, not added to
+the run/setup command environment by MB. They override same-named inherited
+values. Existing IDs, argv and result JSON are unchanged. Collector output goes
+to separate collect-* logs; these variables always refer to the original run
+command's logs, including repeated collection attempts.
+
+A path does not guarantee that a file exists, is nonempty, or contains a finished
+external result. Launch failure, missing files and older aggregate-only runs
+can leave evidence unavailable (in particular, old runs may lack execution.json).
+Collectors must handle this explicitly; MB does not create replacement evidence
+or guess the newest external result. Absolute paths are local to the original
+execution environment; moving a run or collecting on another host does not
+automatically rebase them.
+
+Supported execution.json fields for command collectors:
+- job_id and run_id identify the execution.
+- started_at, finished_at and duration_s describe the local command.
+- contract.id and contract.payload contain the frozen Job ID and execution
+  contract defined above.
+- observation may contain returncode, timed_out or launch_error; these fields
+  are conditional and are execution evidence, not a verdict.
+
+Other fields, including nested internal ExecutionContext paths, remain adapter
+implementation details. Prefer the environment paths to decoding those fields.
+See [Collector from execution logs](Collector_From_Logs.md) for a runnable
+integration that leaves the producer independent of MB.
 
 ## Collection protocol
 

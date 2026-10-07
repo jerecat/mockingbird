@@ -58,7 +58,10 @@ Without collector args, the resolved args is [job_id]:
 
 Both commands receive MB_JOB_ID and MB_RUN_ID in the environment. The project
 uses these to associate its external work/results. No external scheduler IDs
-or directory layout are required by MB.
+or directory layout are required by MB. Alternatively, leave the producer
+unchanged and read its saved output through MB_STDOUT_PATH or MB_STDERR_PATH
+in the collector. MB_EXECUTION_JSON provides its execution record location.
+See [Collector from logs](Collector_From_Logs.md) for the input contract and sample.
 
 The collector prints one JSON object and exits zero:
 

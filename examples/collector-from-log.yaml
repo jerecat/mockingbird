@@ -1,0 +1,25 @@
+name: collector-from-log
+workspace: ./work/collector-from-log
+run_root: ./runs/collector-from-log
+sources: []
+setup:
+  jobs: []
+
+execution:
+  defaults:
+    command: [python3, examples/log_location_run.py]
+    args: []
+    timeout_s: 10
+    collect:
+      command: [python3, examples/log_location_collect.py]
+      args: []
+      timeout_s: 10
+  jobs:
+    - first
+    - second
+
+scheduler:
+  capacity_provider: fixed
+  max_parallel: 1
+  config:
+    slots: 1

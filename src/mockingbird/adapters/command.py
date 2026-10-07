@@ -143,7 +143,12 @@ class Adapter(ExecutionAdapter):
         execution_context = ExecutionContext(**execution.observation["execution_context"])
         # These environment variables are part of the external command contract.
         # No external scheduler IDs or artifact locations are interpreted by MB.
-        env = dict(os.environ, MB_JOB_ID=execution.job_id, MB_RUN_ID=execution.run_id)
+        env = dict(
+            os.environ, MB_JOB_ID=execution.job_id, MB_RUN_ID=execution.run_id,
+            MB_EXECUTION_JSON=str((Path(execution_context.job_dir) / "execution.json").resolve()),
+            MB_STDOUT_PATH=str(Path(execution_context.stdout_path).resolve()),
+            MB_STDERR_PATH=str(Path(execution_context.stderr_path).resolve()),
+        )
         process = run_process([*collect["command"], *collect["args"]], execution_context,
                               cwd=context["invocation_dir"], env=env, timeout_s=collect["timeout_s"],
                               log_name=f"collect-{uuid4().hex}")

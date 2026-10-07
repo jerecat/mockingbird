@@ -173,7 +173,7 @@ python3 -m pytest -q --ignore=tests/test_cli_aliases.py
 
 This disables automatic loading of third-party pytest plugins and excludes two
 CLI registration tests that import Python 3.11's `tomllib`. The current expected
-result is **275 passed**. This was verified with Python 3.10.19, PyYAML 5.4.1 and
+result is **282 passed**. This was verified with Python 3.10.19, PyYAML 5.4.1 and
 pytest 8.4.2; pytest 9.0.3 has not yet been verified in this combination.
 
 Tests create temporary files in pytest's temporary directory, normally under
@@ -193,6 +193,10 @@ After editing standard command execution settings, use plan then run; prepare
 is not needed again. Interactive run offers to update a changed plan, while
 non-interactive run stops with instructions. See the
 [editing and troubleshooting guide](Documentation/From_Shell_to_Mockingbird.md#editing-and-diagnosing-your-first-run).
+
+To locate project results from existing stdout, use
+[the collector-from-log example](Documentation/Collector_From_Logs.md).
+The producer does not need to write an MB-specific mapping file.
 
 ## Workspace/run layout
 
