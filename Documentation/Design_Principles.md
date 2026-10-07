@@ -2,6 +2,10 @@
 
 Mockingbird is intentionally a **boring tool**.
 
+Current scope does not permanently exclude advanced capabilities. See the
+[future extensions note](.note/future_extensions.md) for the policy of preserving
+simple defaults while allowing extensions justified by operational needs.
+
 That is a feature.
 
 The design follows a Unix-like preference for small tools with narrow
