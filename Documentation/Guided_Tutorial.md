@@ -27,24 +27,43 @@ All commands execute from that new directory. Existing repository workspaces,
 runs, and example files are not changed. An existing tutorial is not resumed or
 overwritten by another invocation.
 
-The sequence covers:
+## Basic path: two Jobs, two collections
 
-1. Doctor, prepare, setup and plan, with their purpose and saved paths. Doctor
-   groups successful checks; use `mb doctor examples/sample-collector.yaml --details`
-   to inspect individual diagnostics. Its OK does not mean a test has executed.
-2. A two-Job selection preview without execution.
-3. Serial execution of all eight Jobs, then status before collection.
-4. PASS/FAIL/ERROR/SKIP, no-check, PENDING and retryable collection errors.
-5. Project-owned external completion markers and simulated collector recovery.
-6. Collecting only unresolved Jobs, then collecting once more without rerunning
-   final collectors.
-7. Saved record/artifact locations and optional cleanup instructions.
+The default exercise uses test_pass and test_pending from the existing sample.
+Only the copied YAML is reduced to these two Jobs; repository examples stay intact.
 
-The sample intentionally produces nonzero **collect** exit codes. The first
-collect exits 2 (PENDING); later collects exit 1 (final FAIL/ERROR present).
-These are explained before execution. The tutorial checks both expected exit
-codes and collection counts; its own successful completion exits 0.
-A failed step stops the tutorial and retains files for inspection.
+1. Doctor, prepare, setup and plan explain preparation. Doctor's OK does not mean
+   a test ran; use `doctor --details` for individual diagnostics.
+2. Preview the two Jobs, run them serially, and inspect execution records.
+3. **Collect 1/2 — results available now:** test_pass becomes PASS; test_pending
+   remains PENDING. Exit 2 means an external result is not ready yet.
+4. **Make the remaining sample result available:** sample_finish.py --pending-only
+   creates the pending Job's done file. This simulates external work finishing;
+   it is not an MB repair operation or a real simulation. The marker is specific
+   to the sample, not the collector contract.
+5. **Collect 2/2 — remaining result:** collect the same run, obtaining only the
+   pending Job's result. Both Jobs are now PASS (exit 0); no Jobs are rerun.
+6. Inspect the final status, then see saved paths and optional cleanup commands.
+
+No third collect is needed. Repeated collection of final results remains covered
+by regression tests rather than another mandatory tutorial step.
+
+## Optional advanced path
+
+```sh
+mb tutorial --advanced
+```
+
+This starts a separate new exercise with all eight sample Jobs: PASS/FAIL/ERROR/
+SKIP, no-check, PENDING and collector faults. It also collects exactly twice.
+The first collect exits 2 (unresolved results); the helper completes external
+work and removes collector fault markers; the second collect exits 1 because
+final FAIL/ERROR verdicts remain. Expected final counts: PASS 5, FAIL 1, ERROR 1,
+SKIP 1, no unresolved outcomes. Unlike a collection error, final ERROR is not retried.
+
+Both modes explain expected exit codes before execution and check the resulting
+counts. A completed tutorial exits 0. An unexpected failure stops it and keeps
+files for inspection.
 
 ## Directory and unattended options
 

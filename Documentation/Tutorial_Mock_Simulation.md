@@ -1,7 +1,7 @@
 # Mock Simulation Integration Tutorial
 
-Prefer a guided terminal walkthrough? Run `mb tutorial` after an editable install
-from this clone. See [Guided tutorial](Guided_Tutorial.md).
+Start with `mb tutorial` for the two-Job basics. To walk through the eight-Job
+reference below, use `mb tutorial --advanced` after an editable install from this clone. See [Guided tutorial](Guided_Tutorial.md).
 
 No simv, simulator licence or external queue is required. This tutorial creates
 small text files to demonstrate how to connect a user-owned execution command
@@ -119,18 +119,18 @@ Collection is complete, but the retained final FAIL and ERROR judgements make
 the aggregate status FAIL and the exit code **1**. Unlike a collection error,
 a final ERROR judgement is not retried.
 
-## 6. Verify that final outcomes are not collected again
+## 6. Inspect collector call counts (optional)
+
+Collection is complete; no additional collect is required. To inspect which
+collectors were retried:
 
 ```sh
 wc -l "work/sample-results/$RUN_ID"/*/collector_calls.txt
-mb collect examples/sample-collector.yaml --run-dir "$RUN_DIR"
-wc -l "work/sample-results/$RUN_ID"/*/collector_calls.txt
 ```
 
-The four Jobs with initially final collector outcomes have one line each. The
-three recovered Jobs have two lines each. The no-check Job has no call record.
-The third collect does not change these counts. This file is tutorial-only
-instrumentation for observing collector calls.
+Initially final collector outcomes have one call each; the three recovered Jobs
+have two. No-check has no call record. Tests separately verify that further
+collect calls retain final results without invoking their collectors again.
 
 ## 7. Connect your real system
 

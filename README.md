@@ -14,7 +14,8 @@ mb tutorial
 
 Follow the explanations and press Enter at each step. The exercise uses a new
 isolated directory, keeps its files when stopped, and finishes with optional
-manual cleanup instructions. See [Guided tutorial](Documentation/Guided_Tutorial.md).
+manual cleanup instructions. The basic path uses two Jobs and two collections;
+`mb tutorial --advanced` adds failure verdicts and collector faults. See [Guided tutorial](Documentation/Guided_Tutorial.md).
 
 ## Design philosophy
 

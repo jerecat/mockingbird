@@ -7,8 +7,9 @@ command. Full context is still saved in `<workspace>/.reg/context.json`.
 
 For the interactive first-run walkthrough, use `mb tutorial` after installing
 from a clone. It uses a new directory and prints optional manual cleanup commands.
-See [Guided tutorial](Guided_Tutorial.md). Its intentional sample FAIL/PENDING
-outcomes do not make the completed tutorial itself fail.
+See [Guided tutorial](Guided_Tutorial.md). The basic path ends with two PASS
+results after two collections. `--advanced` adds intentional failure verdicts and
+collector faults; a completed tutorial still exits zero.
 
 ## Start and recover
 
