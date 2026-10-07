@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from datetime import datetime, timezone
 from difflib import get_close_matches
 from pathlib import Path
@@ -205,6 +206,7 @@ def prepare(defn: dict[str, Any]) -> dict[str, Any]:
         "setup": resolve_setup(defn.get("setup", {})),
         "scheduler": scheduler,
     }
+    context["preparation_contract"] = preparation_contract(provisional_context(defn))
     write_json(metadata / "context.json", context)
     write_json(metadata / "state.json", {"prepared_at": context["prepared_at"]})
     (metadata / "preparing.json").unlink()
@@ -244,3 +246,40 @@ def update_state(defn: dict[str, Any], **values: Any) -> dict[str, Any]:
 def load_state(defn: dict[str, Any]) -> dict[str, Any]:
     path = metadata_path(defn) / "state.json"
     return read_json(path) if path.exists() else {}
+
+
+def preparation_contract(context):
+    """Fields whose changes require preparation rather than just a new plan."""
+    sources = []
+    for item in context.get("sources", []):
+        if "requested_revision" in item:  # Compatibility with older saved contexts.
+            source = {key: item[key] for key in ("name", "provider", "url")}
+            source["revision"] = item["requested_revision"]
+            source["config"] = item.get("config", {})
+        else:
+            source = dict(item)
+            source.setdefault("revision", "HEAD")
+            source.setdefault("config", {})
+        sources.append(source)
+    execution = context["execution"]
+    return {
+        "name": context["name"], "paths": context["paths"],
+        "sources": sources, "setup": context.get("setup", {"jobs": []}),
+        "scheduler": context["scheduler"],
+        # Custom adapter setup may depend on its entire config.
+        "execution": {"adapter": "command"} if execution["adapter"] == "command" else execution,
+    }
+
+
+def planning_context(defn, saved):
+    """Overlay live execution intent without reacquiring or modifying sources."""
+    current_defn = dict(defn, _invocation_dir=saved["invocation_dir"])
+    current = provisional_context(current_defn)
+    baseline = saved.get("preparation_contract", preparation_contract(saved))
+    if preparation_contract(current) != baseline:
+        raise PrerequisiteError(
+            "preparation settings changed (sources, setup, scheduler, paths, name or adapter)",
+            *_preparation_steps(defn))
+    context = copy.deepcopy(saved)
+    context["execution"] = current["execution"]
+    return context

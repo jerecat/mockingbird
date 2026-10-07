@@ -59,7 +59,9 @@ obtain one when investigating a failure. Parser usage errors still show help.
 stdout. Redirect stdout to a file to consume it. Diagnostics go to stderr.
 `collect --json` returns the full result, not just its `summary` member.
 Scripts that previously parsed the default prepare/collect/all output should
-use explicit JSON options or saved files. Persisted schemas are unchanged.
+use explicit JSON options or saved files. Saved plan.json now includes the normalized execution input alongside resolved
+Jobs. Each run saves that execution configuration in its own context.json.
+Older plans without this field compare against their prepared execution config.
 
 ```sh
 mb prepare examples/sample-collector.yaml --json > context-copy.json
@@ -112,3 +114,15 @@ waiting rather than an execution-ready slot.
 
 Setup command lists and edit/retry behaviour are described in [Setup Contract](Setup_Contract.md).
 With no setup list, the standard command adapter permits prepare directly followed by plan.
+
+## Edit execution and replan
+
+For the standard command adapter, execution YAML edits need only plan, then run.
+An interactive run with changed execution asks "Update the plan and run? [Y/n]".
+Enter/Y creates and validates a new plan; n/EOF cancels. Non-terminal stdin stops
+with a plan prerequisite error. Preparation changes are never auto-applied.
+Custom adapter config changes still require prepare/setup.
+
+Launch errors print the reason and execution.json/stderr.log paths immediately.
+Nonzero exit codes and timeouts also print these paths. This reports execution
+evidence and does not change collector or no-check verdict semantics.

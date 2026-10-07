@@ -231,5 +231,7 @@ execution:
 The first Job invokes `./run.sh --verbose --test test_a --mode regression`.
 Argument order is literal; Mockingbird does not interpret flags or apply shell
 expansion. Use `examples/args-suffix.yaml` for a runnable demonstration.
-After editing an already prepared definition, repeat prepare and plan to adopt
-the changed contract (and setup if the definition requires it).
+After editing execution in an already prepared standard command definition,
+repeat plan to adopt the changed contract. Run rejects changes not yet planned;
+interactive run offers to update the plan first. Preparation-related changes
+still require prepare and setup where applicable. See ADR 0013.

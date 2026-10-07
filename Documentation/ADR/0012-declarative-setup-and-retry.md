@@ -26,7 +26,8 @@ be collected from their saved context.
 
 Every attempt preserves its contract, records and command logs. Retry starts the
 full list again, without rollback or deleting edits. Script/source edits are live;
-YAML edits require another prepare. No automatic retry, resume, dependency graph,
+Setup YAML edits require another prepare. Execution-only edits for the standard
+command adapter require plan instead (ADR 0013). No automatic retry, resume, dependency graph,
 capacity scheduling, or asynchronous setup collection is introduced.
 
 ## Consequences

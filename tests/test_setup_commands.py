@@ -111,7 +111,7 @@ def test_yaml_is_frozen_but_script_edits_are_not(tmp_path, monkeypatch):
     data['setup']['jobs'][0]['command'][-1] = 'pass'
     Path(d['_definition_path']).write_text(yaml.safe_dump(data))
     edited = load_definition(d['_definition_path'])
-    with pytest.raises(RuntimeError, match="exit=4"): lifecycle.setup(edited)
+    with pytest.raises(RuntimeError, match="preparation settings changed"): lifecycle.setup(edited)
     prepare(edited)
     lifecycle.setup(edited)
     lifecycle.create_plan(edited)

@@ -14,7 +14,8 @@ not make multiple writes transactional.
 
 - A prepared workspace belongs to the canonical definition path in its context.
   Setup, plan and run reject another definition. Explicit prepare may replace that
-  association. Edits to the same definition remain frozen until prepare succeeds.
+  association. Preparation settings remain frozen until prepare succeeds. ADR 0013 allows
+  standard command execution edits to be adopted by plan.
   Collect checks the definition against the run's saved context, and does not
   require the current workspace to be prepared: an old run remains collectable
   after a later prepare fails.

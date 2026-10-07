@@ -130,9 +130,9 @@ Replace the Job's `collect` mapping with:
         timeout_s: 10
 ```
 
-Run **prepare and plan again** to adopt the changed definition, then run
-and collect. Editing YAML does not change an already prepared context or saved
-run. A previous no-check result will remain final; use the new run.
+Run **plan again** to adopt the changed execution definition, then run
+and collect. No prepare or source acquisition is needed for this change.
+Editing YAML does not alter a saved run. A previous no-check result will remain final; use the new run.
 
 Both commands receive `MB_RUN_ID` and `MB_JOB_ID`. The sample producer and
 collector agree on `results/<run-id>/<job-id>/result.txt`; that layout belongs
@@ -247,3 +247,62 @@ See [ADR 0011](ADR/0011-reuse-user-managed-source-trees.md).
 
 For exact field rules, continue to [Execution Contract](Execution_Contract.md).
 For capacity and asynchronous submission, use [Integration Guide](Integration_Guide.md).
+
+## Editing and diagnosing your first run
+
+For a prepared standard command setup, edit execution, then run:
+
+    mb plan my-run.yaml
+    mb run my-run.yaml
+
+Plan validates the current execution settings. It does not repeat source
+acquisition or successful setup. If you forget plan, an interactive run asks:
+
+    Execution settings changed since plan.
+    Update the plan and run? [Y/n]
+
+Enter/Y updates and validates the plan before starting any Job. n or end of input
+cancels without execution. Invalid answers are prompted again. With non-terminal
+stdin (CI, pipes, or redirection), run stops and prints the plan command instead.
+Missing plans still require an explicit plan command. A new run starts from the
+selected list's beginning; it is not a continuation of an interrupted run.
+
+Preparation changes (sources, setup, scheduler, name, workspace/run paths, or
+adapter choice) still require prepare, then setup if needed, then plan.
+Custom Python adapter configuration also requires prepare/setup because its
+setup hook may depend on that configuration. Script/source file edits remain
+live and are not detected or hashed.
+
+### Arguments are a list, not a shell command line
+
+To invoke bash ./work/project/run.sh -c -e xxx, write:
+
+    command: [bash, ./work/project/run.sh]
+    args: ["-c", "-e", "xxx"]
+
+Each list item is one argument. YAML commas and surrounding quotes are not
+passed to the process. A single item "-c -e xxx" stays one argument containing
+spaces; it is not split. Numeric arguments must be strings, for example "123".
+Use args: [] for no arguments; omitted args inherits defaults or becomes [job_id].
+Execution appends args_suffix after args; clear it on sleep Jobs if necessary.
+
+### Working directory
+
+The command runs from the directory recorded by prepare. Neither the YAML file's
+directory nor the script's directory implies a change of working directory.
+Use a project wrapper that changes directory explicitly if the tool requires it.
+A later plan preserves the prepared working directory.
+
+### Find a failure
+
+Run prints an execution error's reason and its record/log paths immediately.
+For a nonzero exit or timeout, it also prints where to inspect the record and
+stderr. All Job output is saved under:
+
+    <run_root>/<run_id>/jobs/<safe-job-directory>/logs/stdout.log
+    <run_root>/<run_id>/jobs/<safe-job-directory>/logs/stderr.log
+    <run_root>/<run_id>/jobs/<safe-job-directory>/execution.json
+
+If the command never launched, stdout/stderr may be empty; launch_error in
+execution.json records the cause. These are MB's command logs. Project-created
+sim.log or waveform paths remain under the script's control.

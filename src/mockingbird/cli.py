@@ -12,7 +12,7 @@ from pathlib import Path
 
 from . import lifecycle
 from .context import load_definition, prepare
-from .errors import PrerequisiteError
+from .errors import PrerequisiteError, PlanChangedError
 from .doctor import doctor_failed, run_doctor
 from .selection import Selection, write_selection_file
 from .status import snapshot
@@ -74,6 +74,21 @@ def _confirm() -> bool:
     except EOFError:
         return False
     return answer in {"y", "yes"}
+
+
+
+def _confirm_plan_update():
+    print("Execution settings changed since plan.")
+    while True:
+        try:
+            answer = input("Update the plan and run? [Y/n] ").strip().lower()
+        except EOFError:
+            return False
+        if answer in {"", "y", "yes"}:
+            return True
+        if answer in {"n", "no"}:
+            return False
+        print("Enter Y to update and run, or n to cancel.")
 
 
 def _summary(result: dict) -> str:
@@ -209,6 +224,19 @@ def _progress(event, execution):
         elif 'launch_error' in observation or 'executor_error' in observation:
             text += " (execution error)"
     print(f"[{event['index']}/{event['total']}] {event['job_id']}: {text}", flush=True)
+    if execution and isinstance(execution.observation, dict):
+        observation = execution.observation
+        error = observation.get("launch_error") or observation.get("executor_error")
+        failed = error or observation.get("timed_out") or observation.get("returncode", 0) != 0
+        if error:
+            print(f"  {error}", flush=True)
+        if failed:
+            paths = observation.get("execution_context", {})
+            if paths.get("job_dir"):
+                print(f"  Record: {Path(paths['job_dir']) / 'execution.json'}", flush=True)
+            if paths.get("stderr_path"):
+                print(f"  Stderr: {paths['stderr_path']}", flush=True)
+
 
 
 def _setup_progress(index, total, job_id, state):
@@ -332,7 +360,16 @@ def _dispatch(args, parser) -> None:
 
     if args.command == "run":
         selection = _selection(args)
-        context, selected, meta = lifecycle.preview(defn, selection)
+        try:
+            context, selected, meta = lifecycle.preview(defn, selection)
+        except PlanChangedError:
+            if not sys.stdin.isatty():
+                raise
+            if not _confirm_plan_update():
+                print("run: cancelled; no Jobs started")
+                return
+            lifecycle.create_plan(defn)
+            context, selected, meta = lifecycle.preview(defn, selection)
         if args.interactive:
             _print_checklist(context, selected, meta)
             if not _confirm():

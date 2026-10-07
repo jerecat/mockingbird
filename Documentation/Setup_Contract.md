@@ -84,9 +84,10 @@ Previously successful setup Jobs may execute again. Make setup scripts repeatabl
 or have them detect already prepared outputs themselves. Partial outputs and user
 edits remain in place; MB does not undo them.
 
-Script/source content edits do not require prepare. **YAML contract edits do**:
+Script/source content edits do not require prepare. **setup YAML contract edits do**:
 run prepare again to adopt changed commands, arguments or timeouts, then setup
-and plan. Saved context freezes the contract, not source/script contents.
+and plan. Saved context freezes setup, not source/script contents. Changes only to
+standard command execution are adopted by plan without repeating setup.
 
 Each attempt has a unique directory under:
 

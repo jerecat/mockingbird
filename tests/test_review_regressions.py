@@ -35,11 +35,14 @@ def test_wrong_definition_rejected_before_dispatch(tmp_path):
     assert not list((tmp_path / "runs").iterdir())
 
 
-def test_same_definition_edits_remain_frozen_until_prepare(tmp_path):
+def test_same_definition_edits_require_plan_without_prepare(tmp_path):
     d = definition(tmp_path)
     ready(d)
     d["execution"]["jobs"] = ["new"]
-    assert [j.id for j in lifecycle.plan_jobs(d)] == ["a", "b"]
+    with pytest.raises(RuntimeError, match="execution settings changed"):
+        lifecycle.plan_jobs(d)
+    lifecycle.create_plan(d)
+    assert [j.id for j in lifecycle.plan_jobs(d)] == ["new"]
 
 
 def test_collect_checks_run_definition_but_does_not_need_current_prepared_workspace(tmp_path):

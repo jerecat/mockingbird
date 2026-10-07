@@ -10,8 +10,8 @@ from typing import Any
 
 from .adapter_utils.setup import execute_setup_job
 from .setup_contract import setup_required
-from .errors import PrerequisiteError
-from .context import load_context, load_state, metadata_path, update_state, validate_definition_identity
+from .errors import PrerequisiteError, PlanChangedError
+from .context import load_context, load_state, metadata_path, update_state, validate_definition_identity, planning_context
 from .io import collection_lock, read_json, write_json
 from .models import ExecutionContext, Job, JobExecution, TestResult
 from .plugins import load_adapter, load_capacity_provider
@@ -33,8 +33,8 @@ def _timestamp_id(name: str) -> str:
     return f"{stamp}_{safe}"
 
 
-def _components(defn: dict[str, Any]):
-    context = load_context(defn)
+def _components(defn: dict[str, Any], context=None):
+    context = context if context is not None else load_context(defn)
     adapter = load_adapter(str(context["execution"]["adapter"]))
     scheduler = context["scheduler"]
     capacity = load_capacity_provider(
@@ -84,7 +84,7 @@ def _require_setup(context, state):
 
 
 def setup(defn: dict[str, Any], *, on_progress=None) -> Path | None:
-    context = load_context(defn)
+    context = planning_context(defn, load_context(defn))
     if not setup_required(context):
         return None
     attempt = metadata_path(defn) / "setup" / _timestamp_id("setup")
@@ -130,7 +130,7 @@ def setup(defn: dict[str, Any], *, on_progress=None) -> Path | None:
 
 def create_plan(defn: dict[str, Any]) -> dict[str, Any]:
     state = load_state(defn)
-    context = load_context(defn)
+    context = planning_context(defn, load_context(defn))
     _require_setup(context, state)
 
     adapter = load_adapter(str(context["execution"]["adapter"]))
@@ -145,6 +145,7 @@ def create_plan(defn: dict[str, Any]) -> dict[str, Any]:
     plan = {
         "schema_version": 2,
         "generated_at": _now(),
+        "execution": context["execution"],
         "context_prepared_at": context["prepared_at"],
         "jobs": [job.to_dict() for job in jobs],
     }
@@ -160,17 +161,22 @@ def create_plan(defn: dict[str, Any]) -> dict[str, Any]:
 def load_plan(defn: dict[str, Any]) -> dict[str, Any]:
     path = metadata_path(defn) / "plan.json"
     if not path.exists():
-        context = load_context(defn)
+        context = planning_context(defn, load_context(defn))
         state = load_state(defn)
         _require_setup(context, state)
         raise PrerequisiteError("plan not created", "plan")
     plan = read_json(path)
     if plan.get("schema_version") != 2:
         raise PrerequisiteError("plan schema is obsolete", "plan")
-    context = load_context(defn)
+    saved = load_context(defn)
+    context = planning_context(defn, saved)
     _require_setup(context, load_state(defn))
     if plan.get("context_prepared_at") != context.get("prepared_at"):
         raise PrerequisiteError("plan is stale for the current context", "plan")
+    planned_input = json.dumps(plan.get("execution", saved["execution"]), sort_keys=True)
+    current_input = json.dumps(context["execution"], sort_keys=True)
+    if planned_input != current_input:
+        raise PlanChangedError()
     return plan
 
 
@@ -180,7 +186,7 @@ def plan_jobs(defn: dict[str, Any]) -> list[Job]:
 
 
 def preview(defn: dict[str, Any], selection: Selection) -> tuple[dict, list[Job], dict]:
-    context = load_context(defn)
+    context = planning_context(defn, load_context(defn))
     jobs = plan_jobs(defn)
     selected, selection_meta = select_jobs(jobs, selection)
     return context, selected, selection_meta
@@ -190,10 +196,12 @@ def run(
     defn: dict[str, Any], selection: Selection | None = None, *, on_progress=None
 ) -> tuple[list[JobExecution], Path, dict]:
     selection = selection or Selection()
-    context, adapter, capacity = _components(defn)
+    plan = load_plan(defn)
+    context = load_context(defn)
+    context["execution"] = plan.get("execution", context["execution"])
+    context, adapter, capacity = _components(defn, context)
     validate_max_parallel(context["scheduler"]["max_parallel"])
     positive_seconds(context["scheduler"]["poll_interval_s"], "scheduler.poll_interval_s")
-    plan = load_plan(defn)
     jobs = [Job(**item) for item in plan["jobs"]]
     selected, selection_meta = select_jobs(jobs, selection)
 
