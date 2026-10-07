@@ -58,8 +58,9 @@ def test_sigint_drains_current_job_and_preserves_partial_collection(tmp_path):
         assert marker.exists(), "current Job did not start"
         process.send_signal(signal.SIGINT)
         _, stderr = process.communicate(timeout=10)
-        assert process.returncode != 0
-        assert "KeyboardInterrupt" in stderr
+        assert process.returncode == 130
+        assert "Interrupted." in stderr and "mb status" in stderr
+        assert "Traceback" not in stderr
     finally:
         if process.poll() is None:
             process.kill()

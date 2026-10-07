@@ -2,10 +2,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
+import sys
+from contextlib import redirect_stdout
+from datetime import datetime
+
+import yaml
 from pathlib import Path
 
 from . import lifecycle
 from .context import load_definition, prepare
+from .errors import PrerequisiteError
 from .doctor import doctor_failed, run_doctor
 from .selection import Selection, write_selection_file
 from .status import snapshot
@@ -61,31 +68,48 @@ def _print_checklist(context: dict, selected, selection_meta: dict) -> None:
 
 
 def _confirm() -> bool:
-    answer = input("Proceed with this run? [y/N] ").strip().lower()
+    try:
+        answer = input("Proceed with this run? [y/N] ").strip().lower()
+    except EOFError:
+        return False
     return answer in {"y", "yes"}
 
 
 def _summary(result: dict) -> str:
-    return json.dumps(result["summary"], indent=2)
+    counts = result["summary"]
+    verdicts = "  ".join(f"{key.upper()} {counts[key]}" for key in ("pass", "fail", "error", "skip"))
+    unresolved = "  ".join(f"{key.replace('_', ' ')} {counts[key]}" for key in ("pending", "collection_error", "uncollected"))
+    return f"Result: {result['status']} ({counts['total']} jobs)\n  {verdicts}\n  {unresolved}"
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="mockingbird")
+    parser = argparse.ArgumentParser(
+        prog="mb", description="Run Jobs in list order and collect their results.",
+        epilog="First run: prepare -> setup -> plan -> run -> collect (or use all).")
+    parser.add_argument("--debug", action="store_true", help="show a traceback on errors")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    for name in ("doctor", "prepare", "setup", "collect", "status", "all"):
-        cmd = sub.add_parser(name)
+    descriptions = {
+        "doctor": "check configuration and plugin connections",
+        "prepare": "prepare sources and save the workspace context",
+        "setup": "set up the prepared execution environment",
+        "collect": "collect unresolved results from an existing run",
+        "status": "show saved execution and collection observations",
+        "all": "prepare, setup, plan, run, then collect",
+    }
+    for name, description in descriptions.items():
+        cmd = sub.add_parser(name, help=description, description=description)
         cmd.add_argument("definition")
 
-    plan = sub.add_parser("plan")
+    plan = sub.add_parser("plan", help="validate and save the Job list")
     plan.add_argument("definition")
     plan.add_argument("--write-selection", metavar="PATH")
 
-    dry = sub.add_parser("dry-run")
+    dry = sub.add_parser("dry-run", help="preview the planned selection without executing")
     dry.add_argument("definition")
     _add_selection_args(dry)
 
-    run = sub.add_parser("run")
+    run = sub.add_parser("run", help="execute the prepared plan; does not collect results")
     run.add_argument("definition")
     _add_selection_args(run)
     run.add_argument("--interactive", action="store_true", help="show checklist and ask before run")
@@ -101,31 +125,70 @@ def build_parser() -> argparse.ArgumentParser:
     _add_selection_args(all_cmd)
     all_cmd.add_argument("--interactive", action="store_true")
 
+    status.add_argument("--details", action="store_true", help="include collector reasons and observation times")
+    for name in ("prepare", "collect"):
+        sub.choices[name].add_argument("--json", action="store_true", help="print JSON instead of the human summary")
+    for cmd in sub.choices.values():
+        cmd.add_argument("--debug", action="store_true", default=argparse.SUPPRESS,
+                         help="show a traceback on errors")
     return parser
 
 
-def _status(defn: dict, run_dir: str | None, as_json=False) -> None:
+def _command(command, definition, run_dir=None):
+    parts = ["mb", command, str(definition)]
+    if run_dir is not None:
+        parts.extend(["--run-dir", str(run_dir)])
+    return shlex.join(parts)
+
+
+def _next(command, definition, run_dir=None):
+    print(f"Next: {_command(command, definition, run_dir)}")
+
+
+def _time(value):
+    if not value:
+        return "-"
+    return datetime.fromisoformat(value).astimezone().isoformat(sep=" ", timespec="seconds")
+
+
+def _status(defn: dict, run_dir: str | None, as_json=False, details=False) -> None:
     data = snapshot(defn, run_dir)
     if as_json:
         print(json.dumps(data, indent=2))
         return
-    print(f"Run: {data['run_id']}")
-    print(f"Execution (last recorded): {data['execution_status']}; {data['recorded']}/{data['total']} execution records")
-    print(f"Last execution update: {data['last_execution_update']}")
+    print(f"Run:        {data['run_id']}")
+    print(f"Execution:  {data['execution_status']} ({data['recorded']}/{data['total']} records)")
+    print(f"Updated:    {_time(data['last_execution_update'])}")
     sweep = data['collection_sweep']
     phase = sweep.get('state', 'NOT_STARTED' if not any(j['observed_at'] for j in data['jobs']) else 'UNKNOWN')
-    print(f"Collection: {data['final']}/{data['total']} final; sweep (last recorded): {phase}")
+    print(f"Collection: {data['final']}/{data['total']} final; sweep {phase}")
     counts = data['collection_counts']
-    print(f"  pending={counts['PENDING']}, collection_error={counts['ERROR']}, uncollected={counts['UNCOLLECTED']}")
+    print(f"            pending {counts['PENDING']}  collection errors {counts['ERROR']}  uncollected {counts['UNCOLLECTED']}")
     if sweep:
-        print(f"Last collection update: {sweep['updated_at']}")
-    for job in data['jobs']:
-        state = "COLLECTION_ERROR" if job['collection'] == "ERROR" else job['collection']
-        verdict = job['verdict'] or "-"
-        print(f"  {job['id']}: execution={job['execution']}; collection={state}; verdict={verdict}")
-        if job['reason']:
-            print(f"    Last collector report ({job['observed_at']}): {job['reason']}")
-    print("Saved observations only; process liveness is not checked. Command completion does not imply external completion.")
+        print(f"Updated:    {_time(sweep['updated_at'])}")
+    rows = [("JOB", "EXECUTION", "COLLECTION", "RESULT")]
+    rows.extend((job['id'], job['execution'],
+                 "COLLECTION_ERROR" if job['collection'] == "ERROR" else job['collection'],
+                 job['verdict'] or "-") for job in data['jobs'])
+    widths = [max(len(row[i]) for row in rows) for i in range(4)]
+    print()
+    for row in rows:
+        print("  ".join(value.ljust(width) for value, width in zip(row, widths)).rstrip())
+    reasons = [job for job in data['jobs'] if job['reason']]
+    if details:
+        for job in reasons:
+            print(f"\n{job['id']} — Last collector report ({_time(job['observed_at'])}):")
+            for line in job['reason'].splitlines():
+                print(f"  {line}")
+    elif reasons:
+        print("\nUse --details for collector reasons and observation times.")
+    print("\nLast recorded states; process liveness is not checked.")
+    print("Command completion does not imply external completion.")
+    print(f"run: {data['run_dir']}")
+    if data['execution_status'] != "RUNNING" and data['final'] < data['recorded']:
+        _next("collect", defn['_definition_path'], data['run_dir'])
+    if data['recorded'] < data['total'] and data['execution_status'] != "RUNNING":
+        print("Jobs without execution records cannot be collected; run starts a new run.")
 
 
 def _progress(event, execution):
@@ -148,9 +211,7 @@ def _execution_summary(executions, run_dir):
     print(f"run: {run_dir}", flush=True)
 
 
-def main() -> None:
-    parser = build_parser()
-    args = parser.parse_args()
+def _dispatch(args, parser) -> None:
     defn = load_definition(args.definition)
 
     if args.command == "doctor":
@@ -162,15 +223,30 @@ def main() -> None:
         return
 
     if args.command == "prepare":
-        print(json.dumps(prepare(defn), indent=2))
+        if args.json:
+            with redirect_stdout(sys.stderr):
+                context = prepare(defn)
+            print(json.dumps(context, indent=2))
+        else:
+            print("Preparing workspace...", flush=True)
+            context = prepare(defn)
+            print(f"Prepared: {context['name']}")
+            print(f"Workspace: {context['paths']['workspace']}")
+            print(f"Sources: {len(context['sources'])}")
+            for source in context['sources']:
+                print(f"  {source['name']}: {source.get('materialization', 'prepared')}")
+            _next("setup", args.definition)
         return
 
     if args.command == "setup":
+        print("Setting up execution environment...", flush=True)
         lifecycle.setup(defn)
-        print("setup: OK")
+        print("Setup complete")
+        _next("plan", args.definition)
         return
 
     if args.command == "plan":
+        print("Validating plan...", flush=True)
         plan = lifecycle.create_plan(defn)
         print(f"plan: {len(plan['jobs'])} jobs")
         for job in plan["jobs"]:
@@ -179,6 +255,7 @@ def main() -> None:
             jobs = lifecycle.plan_jobs(defn)
             write_selection_file(args.write_selection, jobs)
             print(f"selection file: {Path(args.write_selection).resolve()}")
+        _next("run", args.definition)
         return
 
     if args.command == "dry-run":
@@ -196,24 +273,32 @@ def main() -> None:
                 return
         executions, run_dir, _ = lifecycle.run(defn, selection, on_progress=_progress)
         _execution_summary(executions, run_dir)
+        _next("collect", args.definition, run_dir)
         return
 
     if args.command == "collect":
-        print("Collection started", flush=True)
-        result, run_dir = lifecycle.collect(defn, args.run_dir)
-        print(_summary(result))
-        print(f"run: {run_dir}")
+        if args.json:
+            with redirect_stdout(sys.stderr):
+                result, run_dir = lifecycle.collect(defn, args.run_dir)
+            print(json.dumps(result, indent=2))
+        else:
+            print("Collection started", flush=True)
+            result, run_dir = lifecycle.collect(defn, args.run_dir)
+            _collection_summary(result, run_dir, args.definition)
         if result["status"] != "PASS":
             raise SystemExit(2 if result["status"] == "PENDING" else 1)
         return
 
     if args.command == "status":
-        _status(defn, args.run_dir, args.json)
+        _status(defn, args.run_dir, args.json, args.details)
         return
 
     if args.command == "all":
+        print("Preparing workspace...", flush=True)
         prepare(defn)
+        print("Setting up execution environment...", flush=True)
         lifecycle.setup(defn)
+        print("Validating plan...", flush=True)
         lifecycle.create_plan(defn)
         selection = _selection(args)
         context, selected, meta = lifecycle.preview(defn, selection)
@@ -226,13 +311,56 @@ def main() -> None:
         _execution_summary(executions, run_dir)
         print("Collection started", flush=True)
         result, _ = lifecycle.collect(defn, run_dir)
-        print(_summary(result))
-        print(f"run: {run_dir}")
+        _collection_summary(result, run_dir, args.definition)
         if result["status"] != "PASS":
             raise SystemExit(2 if result["status"] == "PENDING" else 1)
         return
 
     parser.error(f"unsupported command: {args.command}")
+
+
+def _collection_summary(result, run_dir, definition):
+    print(_summary(result))
+    print(f"run: {run_dir}")
+    if result["status"] != "PASS":
+        print(f"Inspect: {_command('status', definition, run_dir)} --details")
+    if result['summary']['pending'] or result['summary']['collection_error']:
+        print("Collect again after external work finishes or collector errors are resolved.")
+        _next("collect", definition, run_dir)
+    if result['summary']['uncollected']:
+        print("Jobs without execution records cannot be collected; run starts a new run.")
+
+
+def main() -> None:
+    parser = build_parser()
+    args = parser.parse_args()
+    try:
+        _dispatch(args, parser)
+    except KeyboardInterrupt:
+        if args.debug:
+            raise
+        print("Interrupted.", file=sys.stderr)
+        if args.command in {"run", "collect", "all"}:
+            print("Inspect saved state before retrying (if a run was created):", file=sys.stderr)
+            print(f"  {_command('status', args.definition, getattr(args, 'run_dir', None))}", file=sys.stderr)
+        else:
+            print("The operation did not complete; retry it when ready.", file=sys.stderr)
+        raise SystemExit(130) from None
+    except Exception as exc:
+        if args.debug:
+            raise
+        message = str(exc) or type(exc).__name__
+        print(f"Error: {message}", file=sys.stderr)
+        if isinstance(exc, PrerequisiteError):
+            print("Required steps:", file=sys.stderr)
+            for step in exc.steps:
+                if step == args.command:
+                    break
+                print(f"  {_command(step, args.definition)}", file=sys.stderr)
+            print("Then retry your command.", file=sys.stderr)
+        elif not isinstance(exc, (ValueError, OSError, yaml.YAMLError)):
+            print("Use --debug for a traceback.", file=sys.stderr)
+        raise SystemExit(1) from None
 
 
 if __name__ == "__main__":

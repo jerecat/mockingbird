@@ -93,7 +93,7 @@ def test_status_reads_partial_checkpoints_not_stale_result(tmp_path, monkeypatch
     state = snapshot(defn)
     assert state["collection_sweep"]["state"] == "STOPPED"
     assert state["collection_counts"] == {"COMPLETE": 0, "PENDING": 1, "ERROR": 0, "UNCOLLECTED": 1}
-    _status(defn, None)
+    _status(defn, None, details=True)
     output = capsys.readouterr().out
     assert "Last collector report" in output and "simulation running" in output
     assert (rd / "collection_progress.json").read_bytes() == before
@@ -138,5 +138,6 @@ def test_display_separates_final_error_from_collection_error(tmp_path, monkeypat
     lifecycle.collect(defn, rd)
     _status(defn, str(rd))
     output = capsys.readouterr().out
-    assert "collection=COMPLETE; verdict=ERROR" in output
-    assert "collection=COLLECTION_ERROR; verdict=-" in output
+    rows = [line.split() for line in output.splitlines() if line.startswith(("a ", "b "))]
+    assert rows == [["a", "RECORDED", "COMPLETE", "ERROR"],
+                    ["b", "RECORDED", "COLLECTION_ERROR", "-"]]

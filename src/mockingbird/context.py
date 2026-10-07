@@ -7,6 +7,7 @@ from typing import Any
 import yaml
 
 from . import __version__
+from .errors import PrerequisiteError
 from .io import read_json, write_json
 from .plugins import load_source_provider
 from .scheduler import validate_max_parallel
@@ -189,10 +190,10 @@ def prepare(defn: dict[str, Any]) -> dict[str, Any]:
 
 def load_context(defn: dict[str, Any]) -> dict[str, Any]:
     if (metadata_path(defn) / "preparing.json").exists():
-        raise RuntimeError("prepare is incomplete; run 'mockingbird prepare' again")
+        raise PrerequisiteError("prepare is incomplete", "prepare", "setup", "plan")
     path = metadata_path(defn) / "context.json"
     if not path.exists():
-        raise RuntimeError("context not prepared; run 'mockingbird prepare' first")
+        raise PrerequisiteError("context not prepared", "prepare", "setup", "plan")
     context = read_json(path)
     validate_definition_identity(defn, context)
     return context

@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .errors import PrerequisiteError
 from .context import load_context, load_state, metadata_path, update_state, validate_definition_identity
 from .io import collection_lock, read_json, write_json
 from .models import ExecutionContext, Job, JobExecution, TestResult
@@ -76,7 +77,7 @@ def create_plan(defn: dict[str, Any]) -> dict[str, Any]:
     state = load_state(defn)
     context = load_context(defn)
     if state.get("setup_context_prepared_at") != context["prepared_at"]:
-        raise RuntimeError("setup is missing or stale; run 'mockingbird setup' first")
+        raise PrerequisiteError("setup is missing or stale", "setup", "plan")
 
     adapter = load_adapter(str(context["execution"]["adapter"]))
     plan_path = metadata_path(defn) / "plan.json"
@@ -105,13 +106,16 @@ def create_plan(defn: dict[str, Any]) -> dict[str, Any]:
 def load_plan(defn: dict[str, Any]) -> dict[str, Any]:
     path = metadata_path(defn) / "plan.json"
     if not path.exists():
-        raise RuntimeError("plan not created; run 'mockingbird plan' first")
+        context = load_context(defn)
+        state = load_state(defn)
+        steps = ("plan",) if state.get("setup_context_prepared_at") == context["prepared_at"] else ("setup", "plan")
+        raise PrerequisiteError("plan not created", *steps)
     plan = read_json(path)
     if plan.get("schema_version") != 2:
-        raise RuntimeError("plan schema is obsolete; run mockingbird plan again")
+        raise PrerequisiteError("plan schema is obsolete", "plan")
     context = load_context(defn)
     if plan.get("context_prepared_at") != context.get("prepared_at"):
-        raise RuntimeError("plan is stale for the current context; run 'mockingbird setup' and 'mockingbird plan'")
+        raise PrerequisiteError("plan is stale for the current context", "setup", "plan")
     return plan
 
 
@@ -254,7 +258,7 @@ def _resolve_run_dir(defn: dict[str, Any], run_dir: str | Path | None) -> Path:
     else:
         pointer = metadata_path(defn) / "last_run.json"
         if not pointer.exists():
-            raise RuntimeError("no previous run; run 'mockingbird run' first or pass --run-dir")
+            raise PrerequisiteError("no previous run; pass --run-dir for an existing run, or create a run first", "run")
         path = Path(read_json(pointer)["run_dir"])
     if not path.is_dir():
         raise FileNotFoundError(f"run directory not found: {path}")
