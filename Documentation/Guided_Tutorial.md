@@ -29,7 +29,9 @@ overwritten by another invocation.
 
 The sequence covers:
 
-1. Doctor, prepare, setup and plan, with their purpose and saved paths.
+1. Doctor, prepare, setup and plan, with their purpose and saved paths. Doctor
+   groups successful checks; use `mb doctor examples/sample-collector.yaml --details`
+   to inspect individual diagnostics. Its OK does not mean a test has executed.
 2. A two-Job selection preview without execution.
 3. Serial execution of all eight Jobs, then status before collection.
 4. PASS/FAIL/ERROR/SKIP, no-check, PENDING and retryable collection errors.
