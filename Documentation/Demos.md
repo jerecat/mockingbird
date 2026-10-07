@@ -42,3 +42,15 @@ mockingbird all examples/external-adapter.yaml
 
 Purpose: prove project integration, probe, process utility, and canonical result
 collection without editing the `mockingbird` package.
+
+
+## Virtual operations rehearsal
+
+Run the actual CLI against an isolated simulated external service:
+
+```sh
+python -m pytest -q -s tests/test_virtual_operations.py
+```
+
+This covers pending/error recovery, immutable completed results, capacity gating,
+and a failed-only rerun. See `Virtual_Operations.md` for the observed cycle table.
