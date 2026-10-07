@@ -6,7 +6,8 @@ Current prototype version: **0.5.0**.
 
 ## Try it interactively
 
-After cloning this repository and installing it with `python -m pip install -e .`, run:
+After cloning this repository, install it with `python -m pip install -e .`
+or use the [shared Python workaround](#workaround-shared-python-without-pip) instructions below, then run:
 
 ```sh
 mb tutorial
@@ -137,6 +138,29 @@ make doctor
 make sanity
 make self-demo
 ```
+
+## Workaround: shared Python without pip
+
+For environments with centrally installed Python and PyYAML, run from the clone
+without installing packages. Python 3.10.19 + PyYAML 5.4.1 was verified on Linux;
+pip package metadata still requires Python >=3.11 and PyYAML >=6.0,<7.
+pytest is not needed to run Mockingbird.
+
+From the clone root, in bash or zsh:
+
+```sh
+export MOCKINGBIRD_SRC="$PWD/src"
+
+mb() {
+  PYTHONPATH="$MOCKINGBIRD_SRC${PYTHONPATH:+:$PYTHONPATH}" \
+    python3 -m mockingbird.cli "$@"
+}
+
+mb all examples/linux-commands.yaml
+```
+
+This function applies to the current shell session. Run bundled examples from
+the clone root. No packages are installed or shared Python settings changed.
 
 ## Workspace/run layout
 
