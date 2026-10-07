@@ -1,0 +1,37 @@
+name: linux-commands
+workspace: ./work/linux-commands
+run_root: ./runs/linux-commands
+sources: []
+
+# Run ordinary Linux commands directly, one Job at a time.
+execution:
+  defaults:
+    timeout_s: 30
+    args: []
+    # collect is omitted: plan resolves it to {mode: no-check}.
+  jobs:
+    - id: show_current_directory
+      command: [pwd]
+
+    - id: list_directory
+      command: [ls]
+      args: [-la]
+
+    - id: wait
+      command: [sleep]
+      args: ["1"]
+
+    - id: create_directory
+      command: [mkdir]
+      args: [-p, work/linux-commands/demo-directory]
+
+    - id: remove_directory
+      command: [rmdir]
+      args: [work/linux-commands/demo-directory]
+
+scheduler:
+  capacity_provider: fixed
+  max_parallel: 1
+  poll_interval_s: 0.1
+  config:
+    slots: 1

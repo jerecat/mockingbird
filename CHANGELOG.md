@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Align all bundled definitions and integration guidance with serial operation.
+- Clarify final TestResult versus retryable CollectionAttempt throughout the guide.
+- Record gracefully interrupted runs as INTERRUPTED and allow their saved
+  executions to be collected; never-executed Jobs remain uncollected.
 - Resolve defaults and per-Job overrides into complete validated plan contracts.
 - Support per-Job command/collector, empty arguments, and implicit no-check.
 - Remove generic exit-code judgement; preserve execution facts independently.
@@ -52,4 +56,3 @@
 - Added explicit `--failed-from` selection provenance.
 - Added editable selection files and ID-based selection.
 - Added generic capacity polling and max-parallel scheduling.
-

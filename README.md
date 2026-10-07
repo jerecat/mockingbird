@@ -75,6 +75,10 @@ unresolved Jobs in the same run.
 
 See `Documentation/Execution_Contract.md`.
 
+Normal operation is serial (`max_parallel: 1`): the next command starts after
+the previous command returns and capacity permits dispatch. Bundled examples
+follow this policy; parallel use is deferred. See ADR 0009.
+
 ## Key architecture rules
 
 1. Core never interprets project commands.
@@ -296,4 +300,3 @@ Start here:
 - `Documentation/Integration_Guide.md`
 - `Documentation/Demos.md`
 - `Documentation/ADR/`
-

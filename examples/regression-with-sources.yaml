@@ -30,7 +30,7 @@ execution:
 scheduler:
   # The command must print the TOTAL concurrency currently allowed for this orchestrator.
   capacity_provider: command
-  max_parallel: 8
+  max_parallel: 1
   poll_interval_s: 5.0
   config:
     command: ["python3", "-c", "print(3)"]

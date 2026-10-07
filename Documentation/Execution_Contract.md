@@ -2,9 +2,10 @@
 
 The external boundary is a contract. Mockingbird does not understand compile,
 sleep, simulation, cleanup, artifact locations, or external scheduler IDs.
-Each is an ordinary Job. Jobs are dispatched in list order through the capacity
-gate. There are no dependencies or before/after phases. Parallel completion
-order is not guaranteed; use max_parallel: 1 for serial local command execution.
+Each is an ordinary Job. Normal operation uses max_parallel: 1: Jobs execute
+one at a time in list order through the capacity gate. There are no dependencies
+or before/after phases. The scheduler retains parallel capability, but its use
+is deferred by ADR 0009; all bundled definitions use serial execution.
 A returning submit command does not imply external work has completed.
 
 ## Plan: resolve, validate, freeze
@@ -69,6 +70,13 @@ These do not automatically become TestResult. Every returned execution is saved
 immediately in jobs/<job>/execution.json and in the run's executions.json snapshot.
 An executor/plugin exception is recorded too; it may stop further dispatch.
 Already saved records survive that error. Unexecuted Jobs remain uncollected.
+
+On Ctrl+C during run, dispatch stops and in-flight executor calls are allowed
+to return (or reach their configured timeout) before shutdown completes. The
+run is recorded as INTERRUPTED. Collect can then process its saved executions;
+Jobs that were never executed stay UNCOLLECTED, so the selected set remains
+incomplete. Collect does not resume execution. A second forced interruption or
+SIGKILL is not a graceful shutdown and is outside this recovery guarantee.
 
 The generic built-in exit-code collection mode has been removed. If an integration
 wants a result based on an exit code, its project-owned collector must explicitly

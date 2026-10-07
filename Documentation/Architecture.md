@@ -256,6 +256,9 @@ See `Architecture_Contract.md`, `Execution_Contract.md`,
 
 ## Resolved contracts and collection cycles
 
+Normal operation and bundled definitions use max_parallel: 1, as recorded in
+ADR 0009. Parallel scheduler support remains available for later consideration.
+
 Plan expands defaults into full per-Job command/args/timeout/collect payloads,
 validates, and freezes them. Missing collect becomes no-check. Dispatch remains
 list-ordered and capacity-gated; there is no dependency graph.

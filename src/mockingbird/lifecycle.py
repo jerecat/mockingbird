@@ -234,6 +234,12 @@ def run(
         write_json(run_dir / "executions.json", [item.to_dict() for item in executions])
         run_record["status"] = "EXECUTED"
         return_value = executions
+    except KeyboardInterrupt:
+        # The scheduler stops dispatch and drains in-flight execute calls before
+        # unwinding. Their saved evidence remains available for collection.
+        run_record["status"] = "INTERRUPTED"
+        run_record["error"] = "KeyboardInterrupt: execution interrupted by operator"
+        raise
     except Exception as exc:
         run_record["status"] = "ERROR"
         run_record["error"] = f"{type(exc).__name__}: {exc}"
@@ -308,7 +314,7 @@ def collect(
 def _collect_locked(defn, run_path):
     context = read_json(run_path / "context.json")
     run_record = read_json(run_path / "run.json")
-    if run_record.get("status") not in {"EXECUTED", "COLLECTED", "ERROR"}:
+    if run_record.get("status") not in {"EXECUTED", "COLLECTED", "ERROR", "INTERRUPTED"}:
         raise RuntimeError(f"run is not collectable; status={run_record.get('status')!r}: {run_path}")
     if run_record.get("schema_version") != 2:
         raise RuntimeError("run schema is obsolete; use the previous version to collect this run")

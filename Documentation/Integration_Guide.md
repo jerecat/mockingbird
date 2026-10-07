@@ -26,10 +26,10 @@ Describe that directly:
 
     scheduler:
       capacity_provider: fixed
-      max_parallel: 4
+      max_parallel: 1
       poll_interval_s: 1
       config:
-        slots: 4
+        slots: 1
 
 A string Job entry means command + Job ID. Use a mapping only when argv differs:
 
@@ -79,20 +79,24 @@ Local example:
 
     scheduler:
       capacity_provider: fixed
-      max_parallel: 8
+      max_parallel: 1
       config:
-        slots: 8
+        slots: 1
 
 Compute-center example:
 
     scheduler:
       capacity_provider: command
-      max_parallel: 20
+      max_parallel: 1
       poll_interval_s: 5
       config:
         command: ["./available_slots.sh"]
 
 The capacity wrapper prints one non-negative integer.
+
+Normal operation uses max_parallel: 1: commands run one at a time in list order.
+Capacity still gates each dispatch; zero pauses new execution. External work
+may continue after a submission command returns. See ADR 0009.
 
 Mockingbird never intentionally dispatches above the reported gate. For
 submit-and-return systems, the wrapper must account for already submitted
@@ -146,4 +150,3 @@ Adapter_Conformance_Testing.md.
     [ ] collector returns one final result or unresolved outcome per requested Job
     [ ] large logs remain files
     [ ] no secret is written into context/result/check messages
-

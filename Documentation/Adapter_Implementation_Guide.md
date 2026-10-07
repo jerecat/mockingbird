@@ -126,8 +126,8 @@ naturally records that as opaque observation; normalization belongs in `collect`
 
 ### collect
 
-Translate adapter-owned observations into exactly one `TestResult` per executed
-Job with one canonical status:
+Return one outcome for each requested execution. If the result is final, return
+`TestResult` with one canonical status:
 
 ```text
 PASS
@@ -136,9 +136,16 @@ ERROR
 SKIP
 ```
 
-Use `FAIL` for a test that ran and found a verification failure. Use `ERROR` for
-infrastructure/execution failure such as timeout, missing runtime dependency, or
-broken harness. This distinction is important for closure statistics.
+Use `FAIL` for a test that ran and found a verification failure. A final
+`TestResult` with `ERROR` is a project-defined terminal judgement, for example
+an unrecoverable execution failure. It is retained and not recollected.
+
+If a result is not ready, return `CollectionAttempt` with state `PENDING`.
+If collection itself fails, return `CollectionAttempt` with state `ERROR`.
+Both are unresolved outcomes and are retried in a later collect cycle.
+Core also records collector exceptions or invalid responses as collection errors.
+See the schema 2 examples below. Execution return codes are evidence; only the
+project-owned collector decides whether they imply a final test result.
 
 The minimum collected result contract is `Job ID + canonical status + list[str]`
 artifact references. Artifact references are opaque; they are often paths, but

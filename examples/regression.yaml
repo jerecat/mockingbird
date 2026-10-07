@@ -20,7 +20,7 @@ execution:
 
 scheduler:
   capacity_provider: fixed
-  max_parallel: 2
+  max_parallel: 1
   poll_interval_s: 0.2
   config:
-    slots: 2
+    slots: 1
