@@ -155,3 +155,11 @@ python -m pytest -q -s tests/test_virtual_operations.py
 
 This covers pending/error recovery, immutable completed results, capacity gating,
 and a failed-only rerun. See `Virtual_Operations.md` for the observed cycle table.
+
+## Capacity gate: serial submissions, two external slots
+
+Use `examples/capacity-gate.yaml` with `examples/sample_queue.py` to observe two
+submissions return immediately while the third waits. In another terminal,
+manually complete one external Job to release a slot and resume submission.
+There are no real simulator processes or automatic timers. Follow the full
+[two-terminal walkthrough](Tutorial_Capacity_Gate.md), including cleanup.

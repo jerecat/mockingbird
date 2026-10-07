@@ -97,6 +97,10 @@ Compute-center example:
 
 The capacity wrapper prints one non-negative integer.
 
+For a runnable two-slot external queue demonstration, follow
+[Serial submission with limited external work](Tutorial_Capacity_Gate.md).
+It uses two terminals to show a third submission waiting and then resuming.
+
 Normal operation uses max_parallel: 1: commands run one at a time in list order.
 Capacity still gates each dispatch; zero pauses new execution. External work
 may continue after a submission command returns. See ADR 0009.

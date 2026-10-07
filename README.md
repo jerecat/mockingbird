@@ -352,3 +352,7 @@ Project preparation can be declared as a top-level `setup.jobs` list. See
 [Setup contract and retry workflow](Documentation/Setup_Contract.md) and
 `examples/setup-commands.yaml`. Without setup commands, the standard command
 adapter can go directly from prepare to plan.
+
+To limit unfinished external simulations while submitting serially, try the
+[capacity gate sample](Documentation/Tutorial_Capacity_Gate.md): two external
+slots, three Jobs, and manual completion from a second terminal.
