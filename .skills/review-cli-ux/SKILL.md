@@ -45,6 +45,12 @@ predictions. Passing a preconfigured tutorial is not proof that a new user can
 connect their own scripts. Record discovered explanation gaps and their causes;
 keep the preventive checks in this skill rather than accumulating incident prose.
 
+For guided commands, verify cancellation before and after file creation, refusal
+of existing directories/symlinks, preservation of exercise files, and shell-quoted
+cleanup instructions limited to the created directory. Use normal CLI paths.
+Explain intentional nonzero outcomes before running them, verify resulting state,
+and stop on genuine failures rather than continuing a misleading success tour.
+
 ## Apply these rules
 
 1. Answer: what happened, what needs attention, and what the user can do next.
