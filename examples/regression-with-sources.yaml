@@ -28,7 +28,7 @@ execution:
         command: ["ls", "-la"]
 
 scheduler:
-  # The command must print the TOTAL concurrency currently allowed for this orchestrator.
+  # Illustrative constant allowance. For external in-flight accounting, see capacity-gate.yaml.
   capacity_provider: command
   max_parallel: 1
   poll_interval_s: 5.0

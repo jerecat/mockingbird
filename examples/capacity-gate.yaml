@@ -1,0 +1,26 @@
+name: capacity-gate
+workspace: ./work/capacity-gate
+run_root: ./runs/capacity-gate
+sources: []
+
+execution:
+  defaults:
+    command: [python3, examples/sample_queue.py, submit]
+    args: []
+    timeout_s: 10
+    collect:
+      command: [python3, examples/sample_queue.py, collect]
+      args: []
+      timeout_s: 10
+  jobs:
+    - sim_a
+    - sim_b
+    - sim_c
+
+scheduler:
+  capacity_provider: command
+  max_parallel: 1
+  poll_interval_s: 1
+  config:
+    command: [python3, examples/sample_queue.py, slots]
+    timeout_s: 10
