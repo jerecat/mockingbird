@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .adapter_utils.setup import execute_setup_job
+from .setup_contract import setup_required
 from .errors import PrerequisiteError
 from .context import load_context, load_state, metadata_path, update_state, validate_definition_identity
 from .io import collection_lock, read_json, write_json
@@ -67,17 +69,69 @@ def _execution_context(run_id: str, run_dir: Path, index: int, job: Job) -> Exec
     )
 
 
-def setup(defn: dict[str, Any]) -> None:
-    context, adapter, _ = _components(defn)
-    adapter.setup(context)
-    update_state(defn, setup_at=_now(), setup_context_prepared_at=context["prepared_at"])
+def _setup_ready(context, state):
+    if not setup_required(context) and not state.get("setup_status"):
+        return True
+    return (state.get("setup_context_prepared_at") == context["prepared_at"]
+            and state.get("setup_status", "SUCCEEDED") == "SUCCEEDED")
+
+
+def _require_setup(context, state):
+    if not _setup_ready(context, state):
+        status = state.get("setup_status", "missing or stale")
+        detail = f"; attempt: {state['last_setup_dir']}" if state.get("last_setup_dir") else ""
+        raise PrerequisiteError(f"setup is not ready ({status}){detail}", "setup", "plan")
+
+
+def setup(defn: dict[str, Any], *, on_progress=None) -> Path | None:
+    context = load_context(defn)
+    if not setup_required(context):
+        return None
+    attempt = metadata_path(defn) / "setup" / _timestamp_id("setup")
+    attempt.mkdir(parents=True, exist_ok=False)
+    record = {"id": attempt.name, "status": "RUNNING", "started_at": _now(),
+              "context_prepared_at": context["prepared_at"], "completed": []}
+    # Invalidate earlier success before any command or adapter hook can mutate files.
+    update_state(defn, setup_status="RUNNING", setup_context_prepared_at=None,
+                 last_setup_dir=str(attempt.resolve()))
+    (metadata_path(defn) / "plan.json").unlink(missing_ok=True)
+    write_json(attempt / "context.json", context)
+    write_json(attempt / "setup.json", record)
+    jobs = [Job(**item) for item in context.get("setup", {}).get("jobs", [])]
+    try:
+        for index, job in enumerate(jobs, 1):
+            execution = _execution_context(attempt.name, attempt, index, job)
+            if on_progress:
+                on_progress(index, len(jobs), job.id, "executing")
+            execute_setup_job(context, job, execution)
+            record["completed"].append(job.id)
+            write_json(attempt / "setup.json", record)
+            if on_progress:
+                on_progress(index, len(jobs), job.id, "succeeded")
+        adapter = load_adapter(str(context["execution"]["adapter"]))
+        adapter.setup(context)
+        record["status"] = "SUCCEEDED"
+    except BaseException as exc:
+        record["status"] = "INTERRUPTED" if isinstance(exc, KeyboardInterrupt) else "FAILED"
+        record["error"] = str(exc) or type(exc).__name__
+        update_state(defn, setup_status=record["status"], setup_context_prepared_at=None)
+        if isinstance(exc, Exception):
+            raise RuntimeError(f"setup did not complete: {exc}\nAttempt: {attempt}\n"
+                               "Fix the script/source and run setup again; all setup Jobs restart. "
+                               "If you changed YAML, run prepare first.") from exc
+        raise
+    finally:
+        record["finished_at"] = _now()
+        write_json(attempt / "setup.json", record)
+    update_state(defn, setup_at=_now(), setup_status="SUCCEEDED",
+                 setup_context_prepared_at=context["prepared_at"])
+    return attempt
 
 
 def create_plan(defn: dict[str, Any]) -> dict[str, Any]:
     state = load_state(defn)
     context = load_context(defn)
-    if state.get("setup_context_prepared_at") != context["prepared_at"]:
-        raise PrerequisiteError("setup is missing or stale", "setup", "plan")
+    _require_setup(context, state)
 
     adapter = load_adapter(str(context["execution"]["adapter"]))
     plan_path = metadata_path(defn) / "plan.json"
@@ -108,14 +162,15 @@ def load_plan(defn: dict[str, Any]) -> dict[str, Any]:
     if not path.exists():
         context = load_context(defn)
         state = load_state(defn)
-        steps = ("plan",) if state.get("setup_context_prepared_at") == context["prepared_at"] else ("setup", "plan")
-        raise PrerequisiteError("plan not created", *steps)
+        _require_setup(context, state)
+        raise PrerequisiteError("plan not created", "plan")
     plan = read_json(path)
     if plan.get("schema_version") != 2:
         raise PrerequisiteError("plan schema is obsolete", "plan")
     context = load_context(defn)
+    _require_setup(context, load_state(defn))
     if plan.get("context_prepared_at") != context.get("prepared_at"):
-        raise PrerequisiteError("plan is stale for the current context", "setup", "plan")
+        raise PrerequisiteError("plan is stale for the current context", "plan")
     return plan
 
 

@@ -127,15 +127,15 @@ def run_tutorial(directory: str | None = None, automatic: bool = False, advanced
                                    "Fix the reported error and use GUIDE.md to continue")
             return True
 
+        print("This sample has no setup commands; prepare can go straight to plan.")
         stages = [
             ("1. Check connections", "Doctor checks configuration, executable availability and capacity without starting Jobs.\nThe summary groups these checks; use doctor --details if you need individual diagnostics.", ["doctor", DEFINITION]),
             ("2. Prepare", "Save context in work/sample-collector/.reg/. No source clone is needed.", ["prepare", DEFINITION]),
-            ("3. Setup", "Prepare the adapter environment. This sample needs no project build.", ["setup", DEFINITION]),
-            ("4. Plan", f"Resolve defaults and validate {count} complete Job contracts; nothing executes yet.", ["plan", DEFINITION]),
-            ("5. Preview a selection", f"Preview test_pass and test_pending without executing them. The next run uses all {count} Jobs.",
+            ("3. Plan", f"Resolve defaults and validate {count} complete Job contracts; nothing executes yet.", ["plan", DEFINITION]),
+            ("4. Preview a selection", f"Preview test_pass and test_pending without executing them. The next run uses all {count} Jobs.",
              ["dry-run", DEFINITION, "--test", "test_pass", "--test", "test_pending"]),
-            ("6. Run", f"Execute {count} commands serially. test_pending simulates external work that is still running.\nCommand completion does not mean that external work has finished.", ["run", DEFINITION]),
-            ("7. Status before collection", "Execution records exist; no results have been collected. Status reads saved observations, not liveness.", ["status", DEFINITION]),
+            ("5. Run", f"Execute {count} commands serially. test_pending simulates external work that is still running.\nCommand completion does not mean that external work has finished.", ["run", DEFINITION]),
+            ("6. Status before collection", "Execution records exist; no results have been collected. Status reads saved observations, not liveness.", ["status", DEFINITION]),
         ]
         for title, explanation, args in stages:
             if not step(title, explanation, args):
@@ -148,7 +148,7 @@ def run_tutorial(directory: str | None = None, automatic: bool = False, advanced
                  if advanced else
                  "test_pass is ready; test_pending is not finished yet.\n"
                  "Collect saves the ready result and leaves the other PENDING (exit 2).")
-        if not step("8. Collect 1/2: get the results available now", first, collect, 2):
+        if not step("7. Collect 1/2: get the results available now", first, collect, 2):
             return
         _check_results(run_dir, final=False, advanced=advanced)
         if advanced and not step("Inspect collector failures", "Final ERROR is a judgement. COLLECTION_ERROR means collection failed and can be retried.", status):
@@ -160,7 +160,7 @@ def run_tutorial(directory: str | None = None, automatic: bool = False, advanced
                        if advanced else
                        "Imagine the external simulation has now finished. This SAMPLE helper creates its done file.\n"
                        "It does not run a simulation or repair MB. In real use, your external system finishes the work.")
-        if not step("9. Make the remaining sample result available", explanation +
+        if not step("8. Make the remaining sample result available", explanation +
                     "\nThe done file is this sample's convention, not an MB requirement.", helper, helper=True):
             return
         second = ("Only the three unresolved Jobs are collected. Final counts: PASS 5, FAIL 1, ERROR 1, SKIP 1.\n"
@@ -168,10 +168,10 @@ def run_tutorial(directory: str | None = None, automatic: bool = False, advanced
                   if advanced else
                   "Collect the SAME run again: only test_pending needs a result.\n"
                   "test_pass stays final; neither Job is executed again. Expected: PASS 2 (exit 0).")
-        if not step("10. Collect 2/2: get the remaining result", second, collect, 1 if advanced else 0):
+        if not step("9. Collect 2/2: get the remaining result", second, collect, 1 if advanced else 0):
             return
         _check_results(run_dir, final=True, advanced=advanced)
-        if not step("11. Check that all results are final", f"All {count} results should now be final. No more collect is needed for this run.", status):
+        if not step("10. Check that all results are final", f"All {count} results should now be final. No more collect is needed for this run.", status):
             return
         print("\nRun executes commands. Collect obtains results. If results are pending, collect the same run later.")
         if not advanced:
@@ -215,7 +215,6 @@ is cloned. The basic exercise has two Jobs; --advanced uses all eight sample Job
 ```sh
 mb doctor examples/sample-collector.yaml
 mb prepare examples/sample-collector.yaml
-mb setup examples/sample-collector.yaml
 mb plan examples/sample-collector.yaml
 mb dry-run examples/sample-collector.yaml --test test_pass --test test_pending
 mb run examples/sample-collector.yaml
@@ -259,7 +258,7 @@ the same run later. Final results are retained.
 ## Continue after stopping
 
 Execute the command shown at the paused step, then follow the remaining sequence.
-Do not repeat earlier stages unnecessarily: prepare invalidates setup/plan and
+Do not repeat earlier stages unnecessarily: prepare invalidates the saved plan and
 run creates a NEW run. Use --run-dir for an existing run. If a step failed, fix
 its error first. After interrupting run/collect, inspect status; unexecuted Jobs
 cannot be collected. Invoking tutorial again creates a new exercise, not a resume.
@@ -274,7 +273,7 @@ cannot be collected. Invoking tutorial again creates a new exercise, not a resum
 
 Commands use the invocation directory saved at prepare time as cwd. The sample
 scripts locate their results using MB_RUN_ID and MB_JOB_ID. Changing YAML needs
-prepare/setup/plan again; contracts do not snapshot script contents.
+prepare/plan again (plus setup when configured); contracts do not snapshot script contents.
 
 Optional separate exercise: `mb tutorial --advanced` includes FAIL/ERROR/SKIP,
 no-check and collector fault recovery. Both modes collect exactly twice.

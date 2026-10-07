@@ -1,0 +1,30 @@
+name: setup-demo
+workspace: ./work/setup-demo
+run_root: ./runs/setup-demo
+sources: []
+
+setup:
+  defaults:
+    args: []
+    timeout_s: 30
+  jobs:
+    - id: check_environment
+      command: [python3, -c, "print('Python environment is available')"]
+    - id: prepare_project
+      command: [python3, examples/sample_setup.py]
+
+execution:
+  defaults:
+    command: [python3, -c, "from pathlib import Path; print(Path('work/setup-demo/ready.txt').read_text())"]
+    args: []
+    timeout_s: 30
+    collect:
+      mode: no-check
+  jobs:
+    - show_prepared_file
+
+scheduler:
+  capacity_provider: fixed
+  max_parallel: 1
+  config:
+    slots: 1

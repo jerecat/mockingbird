@@ -67,6 +67,16 @@ def run_doctor(defn: dict[str, Any]) -> list[CheckResult]:
     except Exception as exc:
         checks.append(CheckResult("execution", "plugin", "FAIL", f"{type(exc).__name__}: {exc}"))
 
+    if context.get("setup", {}).get("jobs"):
+        try:
+            setup_context = dict(context)
+            setup_context["execution"] = {"adapter": "command", "config": {"jobs": [
+                {"id": job["id"], **job["payload"]} for job in context["setup"]["jobs"]]}}
+            for check in _safe("setup", "probe", lambda: load_adapter("command").probe(setup_context)):
+                checks.append(CheckResult("setup", check.name, check.status, check.message, check.details))
+        except Exception as exc:
+            checks.append(CheckResult("setup", "probe", "FAIL", str(exc)))
+
     scheduler = context["scheduler"]
     try:
         capacity = load_capacity_provider(
@@ -84,3 +94,4 @@ def run_doctor(defn: dict[str, Any]) -> list[CheckResult]:
 
 def doctor_failed(checks: list[CheckResult]) -> bool:
     return any(item.status.upper() == "FAIL" for item in checks)
+

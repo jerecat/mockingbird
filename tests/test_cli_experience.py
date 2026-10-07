@@ -31,7 +31,7 @@ def test_first_run_recovery_and_human_outputs(session):
     assert missing.returncode == 1 and "Traceback" not in missing.stderr
     assert "context not prepared" in missing.stderr
     commands = [shlex.split(line.strip())[1:] for line in missing.stderr.splitlines() if line.startswith("  mb ")]
-    assert [cmd[0] for cmd in commands] == ["prepare", "setup", "plan"]
+    assert [cmd[0] for cmd in commands] == ["prepare", "plan"]
     for command in commands:
         completed = cli(*command)
         assert completed.returncode == 0, completed.stderr
@@ -107,7 +107,7 @@ def test_stale_plan_recovery_after_reprepare(session):
     output = cli("run", definition)
     assert output.returncode == 1 and "plan is stale" in output.stderr
     commands = [shlex.split(line.strip())[1:] for line in output.stderr.splitlines() if line.startswith("  mb ")]
-    assert [cmd[0] for cmd in commands] == ["setup", "plan"]
+    assert [cmd[0] for cmd in commands] == ["plan"]
     for command in commands:
         assert cli(*command).returncode == 0
     assert cli("run", definition).returncode == 0

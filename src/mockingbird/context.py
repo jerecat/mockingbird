@@ -10,6 +10,7 @@ from . import __version__
 from .errors import PrerequisiteError
 from .io import read_json, write_json
 from .plugins import load_source_provider
+from .setup_contract import resolve_setup, setup_required
 from .scheduler import validate_max_parallel
 from .validation import positive_seconds
 
@@ -91,6 +92,7 @@ def validate_definition(defn: dict[str, Any]) -> None:
     _validate_sources(sources)
 
     _normalize_execution(defn.get("execution"))
+    resolve_setup(defn.get("setup", {}))
 
     scheduler = defn.get("scheduler")
     if not isinstance(scheduler, dict) or not scheduler.get("capacity_provider"):
@@ -122,6 +124,7 @@ def provisional_context(defn: dict[str, Any]) -> dict[str, Any]:
         },
         "sources": [dict(item) for item in defn.get("sources", [])],
         "execution": _normalize_execution(defn["execution"]),
+        "setup": resolve_setup(defn.get("setup", {})),
         "scheduler": scheduler,
     }
 
@@ -180,6 +183,7 @@ def prepare(defn: dict[str, Any]) -> dict[str, Any]:
         },
         "sources": resolved_sources,
         "execution": execution,
+        "setup": resolve_setup(defn.get("setup", {})),
         "scheduler": scheduler,
     }
     write_json(metadata / "context.json", context)
@@ -188,12 +192,18 @@ def prepare(defn: dict[str, Any]) -> dict[str, Any]:
     return context
 
 
+def _preparation_steps(defn):
+    context = {"execution": _normalize_execution(defn.get("execution")),
+               "setup": resolve_setup(defn.get("setup", {}))}
+    return ("prepare", "setup", "plan") if setup_required(context) else ("prepare", "plan")
+
+
 def load_context(defn: dict[str, Any]) -> dict[str, Any]:
     if (metadata_path(defn) / "preparing.json").exists():
-        raise PrerequisiteError("prepare is incomplete", "prepare", "setup", "plan")
+        raise PrerequisiteError("prepare is incomplete", *_preparation_steps(defn))
     path = metadata_path(defn) / "context.json"
     if not path.exists():
-        raise PrerequisiteError("context not prepared", "prepare", "setup", "plan")
+        raise PrerequisiteError("context not prepared", *_preparation_steps(defn))
     context = read_json(path)
     validate_definition_identity(defn, context)
     return context

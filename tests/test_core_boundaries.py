@@ -6,6 +6,8 @@ from pathlib import Path
 
 CORE_FILES = [
     "context.py",
+    "command_fields.py",
+    "setup_contract.py",
     "errors.py",
     "status.py",
     "contracts.py",

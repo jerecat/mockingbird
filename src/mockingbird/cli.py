@@ -16,6 +16,7 @@ from .errors import PrerequisiteError
 from .doctor import doctor_failed, run_doctor
 from .selection import Selection, write_selection_file
 from .status import snapshot
+from .setup_contract import setup_required
 
 
 def _add_selection_args(parser: argparse.ArgumentParser) -> None:
@@ -85,7 +86,7 @@ def _summary(result: dict) -> str:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mb", description="Run Jobs in list order and collect their results.",
-        epilog="First run: prepare -> setup -> plan -> run -> collect (or use all).")
+        epilog="First run: prepare -> setup (if configured) -> plan -> run -> collect (or use all).")
     parser.add_argument("--debug", action="store_true", help="show a traceback on errors")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -210,6 +211,10 @@ def _progress(event, execution):
     print(f"[{event['index']}/{event['total']}] {event['job_id']}: {text}", flush=True)
 
 
+def _setup_progress(index, total, job_id, state):
+    print(f"Setup [{index}/{total}] {job_id}: {state}", flush=True)
+
+
 def _execution_summary(executions, run_dir):
     print(f"Execution finished: {len(executions)} execution records (external completion not checked)")
     print("Collection: not started")
@@ -221,7 +226,7 @@ def _doctor_summary(checks, details=False):
     outcome = "FAILED" if doctor_failed(checks) else "ATTENTION" if attention else "OK"
     print(f"Pre-run checks: {outcome}")
     labels = {"configuration": "Definition", "execution": "Execution and collection",
-              "capacity": "Execution capacity"}
+              "capacity": "Execution capacity", "setup": "Preparation commands"}
     groups = {}
     for item in checks:
         groups.setdefault(item.component, []).append(item)
@@ -294,13 +299,16 @@ def _dispatch(args, parser) -> None:
             print(f"Sources: {len(context['sources'])}")
             for source in context['sources']:
                 print(f"  {source['name']}: {source.get('materialization', 'prepared')}")
-            _next("setup", args.definition)
+            _next("setup" if setup_required(context) else "plan", args.definition)
         return
 
     if args.command == "setup":
         print("Setting up execution environment...", flush=True)
-        lifecycle.setup(defn)
-        print("Setup complete")
+        attempt = lifecycle.setup(defn, on_progress=_setup_progress)
+        if attempt:
+            print(f"Setup complete. Records: {attempt}")
+        else:
+            print("Setup not required: no setup commands configured.")
         _next("plan", args.definition)
         return
 
@@ -354,9 +362,10 @@ def _dispatch(args, parser) -> None:
 
     if args.command == "all":
         print("Preparing workspace...", flush=True)
-        prepare(defn)
-        print("Setting up execution environment...", flush=True)
-        lifecycle.setup(defn)
+        context = prepare(defn)
+        if setup_required(context):
+            print("Setting up execution environment...", flush=True)
+            lifecycle.setup(defn, on_progress=_setup_progress)
         print("Validating plan...", flush=True)
         lifecycle.create_plan(defn)
         selection = _selection(args)
