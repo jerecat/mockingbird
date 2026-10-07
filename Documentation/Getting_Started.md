@@ -114,7 +114,10 @@ no-check does not verify command success. For checked results, supply a project
 collector command in defaults or per Job. Repeated collect visits only unresolved
 Jobs; it does not execute them again.
 
-Read `Execution_Contract.md` first, then `Integration_Guide.md`.
+Start with [From shell commands to Mockingbird](From_Shell_to_Mockingbird.md).
+It connects one familiar shell command to a Job, then adds collection and defaults.
+Use [Execution Contract](Execution_Contract.md) as the field reference and
+[Integration Guide](Integration_Guide.md) for capacity and asynchronous systems.
 
 Only read the adapter implementation/conformance guides when the declarative
 boundary is genuinely insufficient and a custom Python adapter is needed.

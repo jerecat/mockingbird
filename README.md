@@ -51,6 +51,9 @@ Context -> Plan -> Run -> Result
 ```
 
 
+Start with [From shell commands to Mockingbird](Documentation/From_Shell_to_Mockingbird.md)
+for a step-by-step explanation of script paths, worktrees, Jobs, and collectors.
+
 ## Normal project integration: write the contract
 
 Projects that already have a command-line entry point should not need

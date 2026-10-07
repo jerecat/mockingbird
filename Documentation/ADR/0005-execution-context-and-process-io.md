@@ -46,6 +46,9 @@ that script explicitly.
 
 ## Consequences
 
-Large logs do not accumulate in orchestrator memory. Every job has predictable
-filesystem isolation. Adapter implementations share one recommended process
+Large logs do not accumulate in orchestrator memory. Every Job has separate MB record/log directories. The utility defaults to
+a per-Job cwd, but adapters may explicitly override it. The declarative command
+adapter uses the invocation directory saved at prepare time; project source and
+output isolation remain the responsibility of its wrapper scripts. Adapter implementations share one recommended process
 pattern without moving project execution semantics into core.
+

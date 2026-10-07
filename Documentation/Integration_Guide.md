@@ -2,6 +2,9 @@
 
 The normal Mockingbird integration is a contract, not a Python implementation.
 
+New to the configuration? Start with [From shell commands to Mockingbird](From_Shell_to_Mockingbird.md)
+for a runnable existing-worktree example and an explanation of directory ownership.
+
 ## 1. Start from the command a human already runs
 
 Suppose the project already supports:
