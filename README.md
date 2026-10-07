@@ -4,6 +4,18 @@ A deliberately small, contract-driven regression orchestrator prototype.
 
 Current prototype version: **0.5.0**.
 
+## Try it interactively
+
+After cloning this repository and installing it with `python -m pip install -e .`, run:
+
+```sh
+mb tutorial
+```
+
+Follow the explanations and press Enter at each step. The exercise uses a new
+isolated directory, keeps its files when stopped, and finishes with optional
+manual cleanup instructions. See [Guided tutorial](Documentation/Guided_Tutorial.md).
+
 ## Design philosophy
 
 **Mockingbird should not understand the system it orchestrates.**

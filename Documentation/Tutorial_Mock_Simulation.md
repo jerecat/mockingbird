@@ -1,5 +1,8 @@
 # Mock Simulation Integration Tutorial
 
+Prefer a guided terminal walkthrough? Run `mb tutorial` after an editable install
+from this clone. See [Guided tutorial](Guided_Tutorial.md).
+
 No simv, simulator licence or external queue is required. This tutorial creates
 small text files to demonstrate how to connect a user-owned execution command
 and collector to Mockingbird. No additional source repositories are cloned.

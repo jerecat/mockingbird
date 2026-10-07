@@ -5,6 +5,11 @@ machine contracts; `prepare` no longer dumps the entire context to the terminal.
 It reports the prepared set, workspace, source count/materialization, and next
 command. Full context is still saved in `<workspace>/.reg/context.json`.
 
+For the interactive first-run walkthrough, use `mb tutorial` after installing
+from a clone. It uses a new directory and prints optional manual cleanup commands.
+See [Guided tutorial](Guided_Tutorial.md). Its intentional sample FAIL/PENDING
+outcomes do not make the completed tutorial itself fail.
+
 ## Start and recover
 
 ```sh

@@ -17,6 +17,11 @@ mb --help
 
 Both are registered in `pyproject.toml` and invoke the same CLI entry point.
 
+For a guided first experience, run `mb tutorial`. It explains and executes the
+normal lifecycle in a new directory and finishes with optional cleanup guidance.
+See [Guided tutorial](Guided_Tutorial.md). The remaining sections are also useful
+as a manual reference.
+
 ## 2. Run repository tests
 
 ```bash
