@@ -177,7 +177,13 @@ sh ./worktrees/experiment/run.sh write
 Each Job inherits defaults and replaces explicitly specified fields. Arrays and
 `collect` mappings are replaced whole, not merged. If execution `args` is omitted
 from both defaults and the Job, it becomes `[job_id]`. Collector arguments follow
-the same rule independently. Explicit `args: []` means no arguments.
+the same rule independently. Explicit `args: []` means no middle arguments.
+
+For common trailing flags, set `execution.defaults.args_suffix: [--mode, regression]`.
+Execution uses `command + args + args_suffix` in that order. A Job can replace
+`args_suffix`, or set it to `[]` to remove the shared suffix. Omission defaults to
+`[]`. Try `mb all examples/args-suffix.yaml` and inspect its per-Job stdout logs
+for inherited, replaced, and removed trailing arguments.
 
 Repeat prepare/plan after changing this definition. Repeated run creates
 new run IDs; collect/status without `--run-dir` select the latest run. To collect

@@ -16,7 +16,7 @@ from mockingbird.command_fields import mapping as _mapping, argv as _argv, timeo
 
 
 _FINAL_STATUSES = {"PASS", "FAIL", "ERROR", "SKIP"}
-_FIELDS = {"command", "args", "timeout_s", "collect"}
+_FIELDS = {"command", "args", "args_suffix", "timeout_s", "collect"}
 
 
 def _now() -> str:
@@ -78,6 +78,7 @@ class Adapter(ExecutionAdapter):
             payload = {
                 "command": _argv(resolved.get("command"), f"job {job_id!r} command"),
                 "args": _argv(resolved.get("args", [job_id]), "args", empty=True),
+                "args_suffix": _argv(resolved.get("args_suffix", []), "args_suffix", empty=True),
                 "timeout_s": _timeout(resolved.get("timeout_s"), f"job {job_id!r} timeout_s"),
                 "collect": _collector(resolved.get("collect", {"mode": "no-check"}), job_id),
             }
@@ -115,7 +116,7 @@ class Adapter(ExecutionAdapter):
         started_at = _now()
         observation = {"execution_context": execution.to_dict()}
         try:
-            process = run_process([*contract["command"], *contract["args"]], execution,
+            process = run_process([*contract["command"], *contract["args"], *contract.get("args_suffix", [])], execution,
                                   cwd=context["invocation_dir"], timeout_s=contract["timeout_s"],
                                   env=dict(os.environ, MB_JOB_ID=job.id, MB_RUN_ID=execution.run_id))
             observation.update(process.to_observation())

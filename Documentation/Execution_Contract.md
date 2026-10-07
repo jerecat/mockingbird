@@ -46,7 +46,7 @@ No project command is executed by plan. `doctor` checks command availability;
 Every Job can specify all its fields. Defaults only remove repetitive writing:
 500 Jobs still become 500 complete contracts in plan.json.
 
-The resolved payload contains command, args, timeout_s, and collect. Execution
+The resolved payload contains command, args, args_suffix, timeout_s, and collect. Execution
 and collection use this payload, never reapply defaults. Core treats it as opaque.
 
 Rules:
@@ -58,6 +58,10 @@ Rules:
 - A collector command has its own args; absent collector args becomes [job_id].
 - Without collect in either place, collect becomes {mode: no-check}.
 - command must be a non-empty argv list. args is a string list, possibly empty.
+- Execution args_suffix is a string list appended after args; omission means [].
+  Job args_suffix replaces the default as a whole; [] removes the default suffix.
+  It is frozen in plan.json. Older plans without the field use an empty suffix.
+  This field applies to execution, not setup or collector commands.
 - Execution and collector-command timeout_s must be finite positive numbers.
 - Unknown keys in the declarative execution/default/Job/collect contract, invalid
   types, missing required values, and duplicate/invalid Job IDs fail plan.
@@ -69,7 +73,7 @@ execution.defaults. New definitions should use defaults.
 
 ## Execution evidence is not a test result
 
-One permitted Job invokes exactly one project command with command + args.
+One permitted Job invokes exactly one project command with command + args + args_suffix.
 The command runs from the invocation directory saved in context.json.
 stdout/stderr are streamed to per-Job log files. The finite local timeout releases
 local execution resources; MB does not follow handed-off external work.
@@ -205,3 +209,27 @@ Adapter_Implementation_Guide.md for TestResult versus CollectionAttempt.
 An optional top-level `setup` list uses the same command/args/timeout field rules
 without collectors. Its exit codes determine preparation success. This does not
 change run/collect judgement rules. See [Setup Contract](Setup_Contract.md).
+
+## Common trailing arguments
+
+Put common leading flags in command and trailing flags in args_suffix:
+
+```yaml
+execution:
+  defaults:
+    command: [./run.sh, --verbose]
+    args_suffix: [--mode, regression]
+    timeout_s: 3600
+  jobs:
+    - id: test_a
+      args: [--test, test_a]
+    - id: test_b
+      args: [--test, test_b]
+      args_suffix: []  # Omit the common trailing flags for this Job.
+```
+
+The first Job invokes `./run.sh --verbose --test test_a --mode regression`.
+Argument order is literal; Mockingbird does not interpret flags or apply shell
+expansion. Use `examples/args-suffix.yaml` for a runnable demonstration.
+After editing an already prepared definition, repeat prepare and plan to adopt
+the changed contract (and setup if the definition requires it).

@@ -113,7 +113,7 @@ def test_virtual_operator_lifecycle(tmp_path):
     cli('plan')
     plan = read(tmp_path / 'work/.reg/plan.json')
     assert [job['id'] for job in plan['jobs']] == ids
-    assert all(set(job['payload']) == {'command', 'args', 'timeout_s', 'collect'} for job in plan['jobs'])
+    assert all(set(job['payload']) == {'command', 'args', 'args_suffix', 'timeout_s', 'collect'} for job in plan['jobs'])
     cli('dry-run')
     assert not any(e['kind'] == 'submit' for e in events())
 

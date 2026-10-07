@@ -84,7 +84,7 @@ execution:
 ```
 
 A string Job runs as `./run.sh <job-id>`. Defaults are expanded and validated
-by plan; each Job can override command, args, timeout, and collect. no-check is
+by plan; each Job can override command, args, args_suffix, timeout, and collect. no-check is
 also the implicit default and does not verify success. Configure a project-owned
 collector when result judgement is needed. Repeated collect retries only
 unresolved Jobs in the same run.

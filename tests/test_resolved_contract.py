@@ -22,9 +22,9 @@ def test_defaults_resolve_full_contract_and_explicit_empty_and_replacement(tmp_p
     original = copy.deepcopy(config)
     jobs = Adapter().plan(context(tmp_path, config))
     assert config == original
-    assert jobs[0].payload == {"command": ["first"], "args": ["default"], "timeout_s": 3.0,
+    assert jobs[0].payload == {"command": ["first"], "args": ["default"], "args_suffix": [], "timeout_s": 3.0,
                                 "collect": {"command": ["collect"], "args": ["a"], "timeout_s": 4.0}}
-    assert jobs[1].payload == {"command": ["other"], "args": [], "timeout_s": 8.0, "collect": {"mode": "no-check"}}
+    assert jobs[1].payload == {"command": ["other"], "args": [], "args_suffix": [], "timeout_s": 8.0, "collect": {"mode": "no-check"}}
     config["defaults"]["command"][0] = "changed"
     assert jobs[0].payload["command"] == ["first"]
 
@@ -94,7 +94,7 @@ def test_500_jobs_expand_independent_contracts(tmp_path):
     jobs = Adapter().plan(context(tmp_path, {"defaults": {"command": ["run"], "timeout_s": 1},
                                             "jobs": [f"job-{i}" for i in range(500)]}))
     assert len(jobs) == 500
-    assert jobs[-1].payload == {"command": ["run"], "args": ["job-499"], "timeout_s": 1.0,
+    assert jobs[-1].payload == {"command": ["run"], "args": ["job-499"], "args_suffix": [], "timeout_s": 1.0,
                                 "collect": {"mode": "no-check"}}
     jobs[0].payload["command"].append("changed")
     assert jobs[1].payload["command"] == ["run"]

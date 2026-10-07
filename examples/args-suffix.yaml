@@ -1,0 +1,25 @@
+name: args-suffix
+workspace: ./work/args-suffix
+run_root: ./runs/args-suffix
+
+# Print the received arguments; no simulator or collector is required.
+execution:
+  defaults:
+    command: [python3, -c, "import sys; print(repr(sys.argv[1:]))", --verbose]
+    args_suffix: [--mode, regression]
+    timeout_s: 10
+  jobs:
+    - id: inherited
+      args: [--test, test_a]
+    - id: replaced
+      args: [--test, test_b]
+      args_suffix: [--mode, smoke]
+    - id: removed
+      args: [--test, test_c]
+      args_suffix: []
+
+scheduler:
+  capacity_provider: fixed
+  max_parallel: 1
+  config:
+    slots: 1
