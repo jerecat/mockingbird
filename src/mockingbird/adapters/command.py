@@ -12,7 +12,7 @@ from uuid import uuid4
 from mockingbird.adapter_utils import result_from_execution, run_process
 from mockingbird.contracts import ExecutionAdapter
 from mockingbird.models import CollectionAttempt, CheckResult, ExecutionContext, Job, JobExecution
-from mockingbird.validation import positive_seconds
+from mockingbird.command_fields import mapping as _mapping, argv as _argv, timeout as _timeout
 
 
 _FINAL_STATUSES = {"PASS", "FAIL", "ERROR", "SKIP"}
@@ -21,31 +21,6 @@ _FIELDS = {"command", "args", "timeout_s", "collect"}
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-def _mapping(value, field, allowed):
-    if not isinstance(value, dict):
-        raise ValueError(f"{field} must be a mapping")
-    unknown = set(value) - allowed
-    if unknown:
-        raise ValueError(f"{field} has unknown keys: {sorted(unknown)}")
-    return value
-
-
-def _argv(value, field, *, empty=False):
-    if not isinstance(value, list) or (not empty and not value) or any(
-        not isinstance(item, str) or "\0" in item for item in value
-    ):
-        raise ValueError(f"{field} must be a {'possibly empty' if empty else 'non-empty'} list of strings")
-    if not empty and not value[0]:
-        raise ValueError(f"{field} executable must not be empty")
-    return list(value)
-
-
-def _timeout(value, field):
-    if value is None:
-        raise ValueError(f"{field} is required")
-    return positive_seconds(value, field)
 
 
 def _collector(value, job_id):
