@@ -9,6 +9,14 @@ other than the integer 1; omission defaults to 1. The scheduler machinery is
 retained, but parallel use is disabled by ADR 0009.
 A returning submit command does not imply external work has completed.
 
+## Definition fields
+
+The YAML root accepts only `name`, `workspace`, `run_root`, `sources`, `setup`,
+`execution`, and `scheduler`. Unknown or reserved root keys are rejected when
+loading the definition, before preparation or execution. Similar spellings receive
+a suggestion: `setpu` reports `did you mean 'setup'?` instead of silently skipping
+setup. Adapter-owned `execution.config` remains an extension namespace.
+
 ## Plan: resolve, validate, freeze
 
 ```yaml

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from difflib import get_close_matches
 from pathlib import Path
 from typing import Any
 
@@ -21,12 +22,29 @@ def _now() -> str:
 
 def load_definition(path: str | Path) -> dict[str, Any]:
     p = Path(path).resolve()
-    data = yaml.safe_load(p.read_text()) or {}
+    data = yaml.safe_load(p.read_text())
+    if data is None:
+        data = {}
     if not isinstance(data, dict):
         raise ValueError("definition root must be a mapping")
+    _validate_definition_keys(data)
     data["_definition_path"] = str(p)
     data["_invocation_dir"] = str(Path.cwd().resolve())
     return data
+
+
+_DEFINITION_KEYS = {"name", "workspace", "run_root", "sources", "setup", "execution", "scheduler"}
+
+
+def _validate_definition_keys(defn, *, internal=False):
+    allowed = _DEFINITION_KEYS | ({"_definition_path", "_invocation_dir"} if internal else set())
+    unknown = set(defn) - allowed
+    if unknown:
+        hints = []
+        for key in sorted(unknown, key=str):
+            matches = get_close_matches(str(key), sorted(_DEFINITION_KEYS), n=1)
+            hints.append(f"{key!r}" + (f" (did you mean {matches[0]!r}?)" if matches else ""))
+        raise ValueError("unknown definition field(s): " + ", ".join(hints))
 
 
 def _from_invocation(defn: dict[str, Any], value: str) -> Path:
@@ -86,6 +104,7 @@ def _normalize_execution(execution: Any) -> dict[str, Any]:
 
 
 def validate_definition(defn: dict[str, Any]) -> None:
+    _validate_definition_keys(defn, internal=True)
     sources = list(defn.get("sources", []))
     if not all(isinstance(item, dict) for item in sources):
         raise ValueError("sources must be a list of mappings")
