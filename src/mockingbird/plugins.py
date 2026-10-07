@@ -48,11 +48,15 @@ def load_adapter(name: str) -> ExecutionAdapter:
     return cls()
 
 
-def load_capacity_provider(name: str, config: dict[str, Any]) -> CapacityProvider:
+def load_capacity_provider(name: str, config: dict[str, Any], context=None) -> CapacityProvider:
     cls = _load_class("capacity", name, "Provider", CapacityProvider)
-    return cls(config)
+    provider = cls(config)
+    if context is not None:
+        provider.bind_context(context)
+    return provider
 
 
 def load_source_provider(name: str) -> SourceProvider:
     cls = _load_class("sources", name, "Provider", SourceProvider)
     return cls()
+

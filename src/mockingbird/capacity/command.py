@@ -21,8 +21,12 @@ class Provider(CapacityProvider):
             isinstance(item, str) for item in command
         ):
             raise ValueError("capacity command must be a non-empty list of strings")
+        self._cwd = None
         self._command = command
         self._timeout_s = positive_seconds(config.get("timeout_s", 10.0), "capacity timeout_s")
+
+    def bind_context(self, context):
+        self._cwd = context["invocation_dir"]
 
     def probe(self):
         try:
@@ -49,6 +53,7 @@ class Provider(CapacityProvider):
     def available_slots(self) -> int:
         completed = subprocess.run(
             self._command,
+            cwd=self._cwd,
             check=True,
             text=True,
             capture_output=True,

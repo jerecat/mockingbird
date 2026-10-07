@@ -110,8 +110,11 @@ that limit; increasing MB's local concurrency is not required for this workflow.
 
 The capacity command is not given MB_RUN_ID/MB_JOB_ID by MB. This queue's capacity
 is shared across its recorded runs; run and collect use their supplied identities.
-All commands assume the same working directory. Do not run concurrent MB lifecycle
-operations on the same workspace.
+During run, the capacity command uses the invocation directory saved by prepare,
+just like execution and collection commands. Doctor uses the current invocation
+directory for its preflight check. Relative workspace paths still resolve from
+the current invocation, so use the clone directory throughout this tutorial.
+Do not run concurrent MB lifecycle operations on the same workspace.
 
 ## Files, interruption, and cleanup
 

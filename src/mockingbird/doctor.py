@@ -80,7 +80,7 @@ def run_doctor(defn: dict[str, Any]) -> list[CheckResult]:
     scheduler = context["scheduler"]
     try:
         capacity = load_capacity_provider(
-            str(scheduler["capacity_provider"]), dict(scheduler.get("config", {}))
+            str(scheduler["capacity_provider"]), dict(scheduler.get("config", {})), context
         )
         checks.append(
             CheckResult("capacity", "plugin", "PASS", str(scheduler["capacity_provider"]))

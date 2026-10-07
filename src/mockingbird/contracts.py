@@ -48,6 +48,9 @@ class CapacityProvider(ABC):
     later samples; core deliberately does not track external scheduler job IDs.
     """
 
+    def bind_context(self, context: dict[str, Any]) -> None:
+        """Optional context binding; existing custom providers need no changes."""
+
     def probe(self) -> list[CheckResult]:
         try:
             slots = self.available_slots()

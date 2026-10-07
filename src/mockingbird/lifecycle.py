@@ -38,7 +38,7 @@ def _components(defn: dict[str, Any]):
     adapter = load_adapter(str(context["execution"]["adapter"]))
     scheduler = context["scheduler"]
     capacity = load_capacity_provider(
-        str(scheduler["capacity_provider"]), dict(scheduler.get("config", {}))
+        str(scheduler["capacity_provider"]), dict(scheduler.get("config", {})), context
     )
     return context, adapter, capacity
 
