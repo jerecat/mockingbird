@@ -22,3 +22,11 @@ external-demo:
 clean:
 	rm -rf work runs work-self runs-self work-external runs-external .pytest_cache
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +
+
+
+.PHONY: lifecycle-contracts lifecycle-mutations
+lifecycle-contracts:
+	python -m pytest -q tests/test_command_workspace.py tests/test_lifecycle_effects.py
+
+lifecycle-mutations:
+	python tools/check_lifecycle_mutations.py

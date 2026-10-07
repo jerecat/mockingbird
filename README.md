@@ -416,3 +416,6 @@ adapter can go directly from prepare to plan.
 To limit unfinished external simulations while submitting serially, try the
 [capacity gate sample](Documentation/Tutorial_Capacity_Gate.md): two external
 slots, three Jobs, and manual completion from a second terminal.
+
+For lifecycle responsibility checks and targeted mutation testing, see
+[Lifecycle testing](Documentation/Lifecycle_Testing.md).

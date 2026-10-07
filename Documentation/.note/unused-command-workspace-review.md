@@ -39,3 +39,11 @@ removing a side effect changes observable required behaviour. Separate interface
 obligations from useful work performed by the implementation. Cover resource
 ownership with behavioural checks: command-only prepare/setup/run succeeds without
 exec, custom adapters still receive their workspace, and existing user files survive.
+
+## Executable follow-up
+
+[Lifecycle responsibility tests](../Lifecycle_Testing.md) turn the review findings
+into absence/preservation assertions, forbidden side-effect checks, repeated
+operation checks, and a targeted mutation check. Four seeded regressions verify
+that the relevant tests fail; this is evidence of sensitivity to known faults,
+not proof that every remaining operation is necessary.
