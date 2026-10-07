@@ -39,7 +39,7 @@ def _print_checklist(context: dict, selected, selection_meta: dict) -> None:
     for source in context["sources"]:
         print(
             f"       - {source['name']}: {source['resolved_revision']} "
-            f"({source['provider']})"
+            f"({source['provider']}, {source.get('materialization', 'prepared')}; prepare-time revision)"
         )
     print(
         f"  [OK] selection: {len(selected)} / {selection_meta['plan_count']} jobs"
@@ -201,4 +201,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

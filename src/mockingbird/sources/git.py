@@ -68,23 +68,24 @@ class Provider(SourceProvider):
         url = str(source["url"])
         revision = str(source.get("revision", "HEAD"))
 
-        if not (destination / ".git").exists():
+        reused = (destination / ".git").exists()
+        if not reused:
             if destination.exists() and any(destination.iterdir()):
                 raise RuntimeError(f"source destination is not empty: {destination}")
             destination.parent.mkdir(parents=True, exist_ok=True)
             _run(["git", "clone", "--no-checkout", url, str(destination)])
-        else:
-            _run(["git", "remote", "set-url", "origin", url], cwd=destination)
+            resolved = _resolve_revision(destination, revision)
+            _run(["git", "checkout", "--detach", resolved], cwd=destination)
 
-        _run(["git", "fetch", "--all", "--tags", "--prune"], cwd=destination)
-        resolved = _resolve_revision(destination, revision)
-        _run(["git", "checkout", "--detach", "--force", resolved], cwd=destination)
-        _run(["git", "reset", "--hard", resolved], cwd=destination)
-        _run(["git", "clean", "-ffdx"], cwd=destination)
+        # Existing worktrees belong to the user, including local edits, index,
+        # branches, ignored outputs and remote configuration. Inspect only.
+        resolved = _run(["git", "rev-parse", "HEAD"], cwd=destination)
 
         return {
             "resolved_revision": resolved,
+            "materialization": "reused" if reused else "created",
             "provider_metadata": {
-                "head": _run(["git", "rev-parse", "HEAD"], cwd=destination),
+                "head": resolved,
+                "origin_url": _try_run(["git", "remote", "get-url", "origin"], cwd=destination),
             },
         }

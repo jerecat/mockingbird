@@ -165,6 +165,13 @@ See [ADR 0010](Documentation/ADR/0010-checkpoint-ownership-and-prepare-validity.
 
 ## Lifecycle
 
+Prepare acquires sources only when no checkout exists. Existing Git/SVN working
+trees are reused without updates or deletion, including local edits and build
+outputs. To change revisions, use Git/SVN yourself or choose a new workspace.
+Recorded revisions are prepare-time metadata, not snapshots of source contents.
+Mockingbird does not track edits made before or during run. See
+[ADR 0011](Documentation/ADR/0011-reuse-user-managed-source-trees.md).
+
 ```bash
 mockingbird doctor regression.yaml
 mockingbird prepare regression.yaml

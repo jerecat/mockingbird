@@ -46,10 +46,8 @@ class Provider(SourceProvider):
         revision = str(source.get("revision", "HEAD"))
         destination.parent.mkdir(parents=True, exist_ok=True)
 
-        if (destination / ".svn").exists():
-            _run(["svn", "switch", url, str(destination)])
-            _run(["svn", "update", "-r", revision, str(destination)])
-        else:
+        reused = (destination / ".svn").exists()
+        if not reused:
             if destination.exists() and any(destination.iterdir()):
                 raise RuntimeError(f"source destination is not empty: {destination}")
             _run(["svn", "checkout", "-r", revision, url, str(destination)])
@@ -57,7 +55,11 @@ class Provider(SourceProvider):
         resolved = _run(["svn", "info", "--show-item", "revision", str(destination)])
         return {
             "resolved_revision": resolved,
+            "materialization": "reused" if reused else "created",
             "provider_metadata": {
+                "working_copy_url": _run(
+                    ["svn", "info", "--show-item", "url", str(destination)]
+                ),
                 "repository_root": _run(
                     ["svn", "info", "--show-item", "repos-root-url", str(destination)]
                 )

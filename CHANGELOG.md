@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Reuse existing Git/SVN checkouts without updating, cleaning, resetting or
+  rejecting local edits. Record created/reused and the prepare-time local
+  revision; changed source URLs/revisions apply only to new checkouts.
+
 - Reject workspace/definition mismatches and block execution after partial prepare.
 - Make per-Job execution and collection files authoritative; retain legacy
   schema-2 checkpoint compatibility and write aggregate views once per cycle.
