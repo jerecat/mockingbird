@@ -119,7 +119,7 @@ def run_tutorial(directory: str | None = None, automatic: bool = False) -> None:
             return True
 
         stages = [
-            ("1. Check connections", "Doctor checks the local tools without starting Jobs.", ["doctor", DEFINITION]),
+            ("1. Check connections", "Doctor checks configuration, executable availability and capacity without starting Jobs.\nThe summary groups these checks; use doctor --details if you need individual diagnostics.", ["doctor", DEFINITION]),
             ("2. Prepare", "Save context in work/sample-collector/.reg/. No source clone is needed.", ["prepare", DEFINITION]),
             ("3. Setup", "Prepare the adapter environment. This sample needs no project build.", ["setup", DEFINITION]),
             ("4. Plan", "Resolve defaults and validate eight complete Job contracts; nothing executes yet.", ["plan", DEFINITION]),

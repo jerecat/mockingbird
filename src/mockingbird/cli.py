@@ -125,6 +125,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_selection_args(all_cmd)
     all_cmd.add_argument("--interactive", action="store_true")
 
+    sub.choices["doctor"].add_argument("--details", action="store_true", help="show every diagnostic check")
     status.add_argument("--details", action="store_true", help="include collector reasons and observation times")
     for name in ("prepare", "collect"):
         sub.choices[name].add_argument("--json", action="store_true", help="print JSON instead of the human summary")
@@ -214,6 +215,57 @@ def _execution_summary(executions, run_dir):
     print(f"run: {run_dir}", flush=True)
 
 
+def _doctor_summary(checks, details=False):
+    attention = [item for item in checks if item.status.upper() != "PASS"]
+    outcome = "FAILED" if doctor_failed(checks) else "ATTENTION" if attention else "OK"
+    print(f"Pre-run checks: {outcome}")
+    labels = {"configuration": "Definition", "execution": "Execution and collection",
+              "capacity": "Execution capacity"}
+    groups = {}
+    for item in checks:
+        groups.setdefault(item.component, []).append(item)
+    rows = []
+    for component, items in groups.items():
+        label = labels.get(component, "Source " + component[7:] if component.startswith("source:") else component)
+        state = "FAILED" if doctor_failed(items) else "ATTENTION" if any(i.status.upper() != "PASS" for i in items) else "OK"
+        fixed = next((i for i in items if component == "capacity" and i.name == "fixed"
+                      and i.status.upper() == "PASS" and "available_slots" in i.details), None)
+        if fixed:
+            slots = fixed.details["available_slots"]
+            state += f" ({slots} configured slot{'s' if slots != 1 else ''})"
+            if slots == 0:
+                state += "; dispatch will wait"
+        rows.append((label, state))
+    width = max((len(label) for label, _ in rows), default=0)
+    for label, state in rows:
+        print(f"  {label + ':':<{width + 1}} {state}")
+    if any(i.component == "configuration" and i.status.upper() == "PASS" for i in checks):
+        print("  Run order: one Job at a time, in list order.")
+    print("No Jobs executed. These checks do not guarantee a successful run.")
+    if details:
+        print("\nDiagnostic checks:")
+        rows = [("STATUS", "COMPONENT", "CHECK", "MESSAGE")]
+        rows.extend((i.status, i.component, i.name, i.message) for i in checks)
+        widths = [max(len(row[n]) for row in rows) for n in range(3)]
+        for row in rows:
+            prefix = "  ".join(value.ljust(width) for value, width in zip(row[:3], widths)) + "  "
+            lines = row[3].splitlines() or [""]
+            print(prefix + lines[0])
+            for line in lines[1:]:
+                print(" " * len(prefix) + line)
+    elif attention:
+        print("\nNeeds attention:")
+        for item in attention:
+            name = "loading" if item.name == "plugin" else item.name
+            print(f"  {item.status} {item.component} / {name}:")
+            for line in item.message.splitlines():
+                print(f"    {line}")
+    if not details:
+        print("Use --details for individual checks and executable paths.")
+    if doctor_failed(checks):
+        print("Fix the reported issues, then run doctor again.")
+
+
 def _dispatch(args, parser) -> None:
     if args.command == "tutorial":
         from .tutorial import run_tutorial
@@ -223,8 +275,7 @@ def _dispatch(args, parser) -> None:
 
     if args.command == "doctor":
         checks = run_doctor(defn)
-        for item in checks:
-            print(f"{item.status:4}  {item.component:<24} {item.name:<20} {item.message}")
+        _doctor_summary(checks, args.details)
         if doctor_failed(checks):
             raise SystemExit(1)
         return
