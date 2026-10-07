@@ -77,7 +77,8 @@ See `Documentation/Execution_Contract.md`.
 
 Normal operation is serial (`max_parallel: 1`): the next command starts after
 the previous command returns and capacity permits dispatch. Bundled examples
-follow this policy; parallel use is deferred. See ADR 0009.
+follow this policy. Configuration and runtime reject any max_parallel value
+other than the integer 1; omission defaults to 1. See ADR 0009.
 
 ## Key architecture rules
 

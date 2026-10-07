@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Enforce max_parallel as integer 1 in configuration and runtime, including old
+  prepared contexts; reject parallel execution instead of silently clamping it.
 - Align all bundled definitions and integration guidance with serial operation.
 - Clarify final TestResult versus retryable CollectionAttempt throughout the guide.
 - Record gracefully interrupted runs as INTERRUPTED and allow their saved

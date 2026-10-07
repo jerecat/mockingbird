@@ -4,8 +4,9 @@ The external boundary is a contract. Mockingbird does not understand compile,
 sleep, simulation, cleanup, artifact locations, or external scheduler IDs.
 Each is an ordinary Job. Normal operation uses max_parallel: 1: Jobs execute
 one at a time in list order through the capacity gate. There are no dependencies
-or before/after phases. The scheduler retains parallel capability, but its use
-is deferred by ADR 0009; all bundled definitions use serial execution.
+or before/after phases. Configuration and runtime reject max_parallel values
+other than the integer 1; omission defaults to 1. The scheduler machinery is
+retained, but parallel use is disabled by ADR 0009.
 A returning submit command does not imply external work has completed.
 
 ## Plan: resolve, validate, freeze

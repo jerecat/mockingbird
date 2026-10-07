@@ -15,6 +15,11 @@ implementation must not be mistaken for a requirement to use or expand it.
 ## Decision
 
 - Normal operation and current operational rehearsals use max_parallel: 1.
+- Enforce this in configuration validation and at runtime: max_parallel must
+  be the integer 1. Omission defaults to 1. Reject every other value, including
+  booleans, floats and strings; do not silently coerce or clamp them.
+- Runtime validation covers previously prepared contexts as well as direct
+  scheduler calls, before any Job is dispatched. Pytest protects both boundaries.
 - Start the next Job only after the previous local command has returned or its
   bounded local execution has ended, and the capacity gate permits dispatch.
 - Do not introduce a dependency graph, before/after phases, or special Job types.
@@ -40,9 +45,10 @@ unresolved. They do not become implicit dependency barriers between commands.
 The list and local command completion define current execution order. Capacity
 remains a hard dispatch gate, including when it temporarily reports zero.
 
-This is an operating-policy clarification of ADR 0008. It does not remove the
-existing parallel scheduler, change user-owned definitions automatically, or
-invalidate its capacity/concurrency unit tests. Bundled examples and integration
-guidance use max_parallel: 1 to match the normal operating policy.
+This extends ADR 0008 with an enforced serial-only policy. The existing scheduler
+machinery is retained, but parallel execution is disabled. User definitions and
+previously prepared contexts requesting another value fail explicitly.
+Tests verify rejection and serial capacity gating. Bundled examples and
+integration guidance use max_parallel: 1.
 Any future proposal to use parallel execution should explicitly revisit this ADR
 rather than inferring approval from existing code or examples.

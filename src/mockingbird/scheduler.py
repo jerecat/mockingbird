@@ -7,6 +7,12 @@ from typing import Callable
 from .models import Job, JobExecution
 
 
+def validate_max_parallel(value) -> None:
+    """ADR 0009: only an explicit integer 1 enables execution."""
+    if type(value) is not int or value != 1:
+        raise ValueError("scheduler.max_parallel must be the integer 1; parallel execution is disabled")
+
+
 def run_jobs(
     jobs: list[Job],
     execute: Callable[[Job], JobExecution],
@@ -26,6 +32,7 @@ def run_jobs(
     track external scheduler job IDs.
     """
 
+    validate_max_parallel(max_parallel)
     pending = list(jobs)
     running = set()
     results: list[JobExecution] = []

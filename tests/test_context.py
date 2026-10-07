@@ -35,7 +35,7 @@ def test_prepare_supports_any_number_and_mix_of_sources(tmp_path, monkeypatch):
                 "execution": {"adapter": "demo_linux", "config": {"tests": []}},
                 "scheduler": {
                     "capacity_provider": "fixed",
-                    "max_parallel": 2,
+                    "max_parallel": 1,
                     "poll_interval_s": 0.1,
                     "config": {"slots": 2},
                 },
@@ -134,4 +134,3 @@ def test_execution_rejects_ambiguous_adapter_and_top_level_command(tmp_path, mon
 
     with pytest.raises(ValueError, match="both adapter"):
         validate_definition(load_definition(definition_path))
-

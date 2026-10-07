@@ -31,7 +31,7 @@ def _write_definition(path: Path) -> None:
                 },
                 "scheduler": {
                     "capacity_provider": "fixed",
-                    "max_parallel": 2,
+                    "max_parallel": 1,
                     "poll_interval_s": 0.01,
                     "config": {"slots": 2},
                 },
@@ -98,4 +98,3 @@ def test_reprepare_invalidates_old_plan(tmp_path, monkeypatch):
     prepare(defn)
     with pytest.raises(RuntimeError, match="stale"):
         lifecycle.preview(defn, Selection())
-

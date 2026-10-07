@@ -194,6 +194,10 @@ monitor to follow externally handed-off work.
 
 ## AC-19: Capacity is a hard dispatch gate
 
+ADR 0009 restricts max_parallel to the integer 1, enforced in configuration
+validation and at runtime before dispatch. Omission defaults to 1; other values
+are errors, including in previously prepared contexts.
+
 At every scheduling decision, new dispatch is limited by:
 
     allowed_running = min(max_parallel, available_slots())

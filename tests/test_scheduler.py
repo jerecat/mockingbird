@@ -54,12 +54,12 @@ def test_scheduler_respects_external_capacity_and_local_cap():
         jobs,
         execute,
         FixedCapacity(2),
-        max_parallel=4,
+        max_parallel=1,
         poll_interval_s=0.005,
     )
 
     assert [item.job_id for item in result] == [job.id for job in jobs]
-    assert peak == 2
+    assert peak == 1
 
 
 def test_scheduler_polls_until_capacity_becomes_available():
@@ -70,7 +70,7 @@ def test_scheduler_polls_until_capacity_becomes_available():
         jobs,
         lambda job: JobExecution(job.id, _now(), _now(), 0.0),
         capacity,
-        max_parallel=3,
+        max_parallel=1,
         poll_interval_s=0.001,
     )
 
@@ -107,7 +107,7 @@ def test_capacity_drop_to_zero_blocks_new_dispatch_without_killing_running_job()
                 jobs,
                 execute,
                 capacity,
-                max_parallel=8,
+                max_parallel=1,
                 poll_interval_s=0.002,
             )
         )

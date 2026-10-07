@@ -13,7 +13,7 @@ from .context import load_context, load_state, metadata_path, update_state
 from .io import collection_lock, read_json, write_json
 from .models import CollectionAttempt, ExecutionContext, Job, JobExecution, TestResult
 from .plugins import load_adapter, load_capacity_provider
-from .scheduler import run_jobs
+from .scheduler import run_jobs, validate_max_parallel
 from .selection import Selection, select_jobs
 
 
@@ -153,6 +153,7 @@ def run(
 ) -> tuple[list[JobExecution], Path, dict]:
     selection = selection or Selection()
     context, adapter, capacity = _components(defn)
+    validate_max_parallel(context["scheduler"]["max_parallel"])
     plan = load_plan(defn)
     jobs = [Job(**item) for item in plan["jobs"]]
     selected, selection_meta = select_jobs(jobs, selection)
@@ -228,7 +229,7 @@ def run(
             selected,
             execute,
             capacity,
-            int(scheduler["max_parallel"]),
+            scheduler["max_parallel"],
             float(scheduler["poll_interval_s"]),
         )
         write_json(run_dir / "executions.json", [item.to_dict() for item in executions])

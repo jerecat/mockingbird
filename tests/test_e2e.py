@@ -27,7 +27,7 @@ execution:
         command: ["ls", "-la"]
 scheduler:
   capacity_provider: fixed
-  max_parallel: 2
+  max_parallel: 1
   poll_interval_s: 0.01
   config:
     slots: 2
@@ -66,4 +66,3 @@ def test_context_plan_run_result_and_failed_rerun(monkeypatch, tmp_path: Path):
     assert second_result["summary"] == {"total": 1, "pass": 0, "fail": 1, "error": 0, "skip": 0, "pending": 0, "uncollected": 0, "collection_error": 0}
     run_record = json.loads((second_run / "run.json").read_text())
     assert run_record["selection"]["failed_from"] == str(previous_result.resolve())
-

@@ -9,6 +9,7 @@ import yaml
 from . import __version__
 from .io import read_json, write_json
 from .plugins import load_source_provider
+from .scheduler import validate_max_parallel
 
 
 def _now() -> str:
@@ -92,10 +93,8 @@ def validate_definition(defn: dict[str, Any]) -> None:
     scheduler = defn.get("scheduler")
     if not isinstance(scheduler, dict) or not scheduler.get("capacity_provider"):
         raise ValueError("scheduler.capacity_provider is required")
-    max_parallel = int(scheduler.get("max_parallel", 1))
+    validate_max_parallel(scheduler.get("max_parallel", 1))
     poll_interval_s = float(scheduler.get("poll_interval_s", 1.0))
-    if max_parallel < 1:
-        raise ValueError("scheduler.max_parallel must be >= 1")
     if poll_interval_s <= 0:
         raise ValueError("scheduler.poll_interval_s must be > 0")
 
@@ -202,4 +201,3 @@ def update_state(defn: dict[str, Any], **values: Any) -> dict[str, Any]:
 def load_state(defn: dict[str, Any]) -> dict[str, Any]:
     path = metadata_path(defn) / "state.json"
     return read_json(path) if path.exists() else {}
-

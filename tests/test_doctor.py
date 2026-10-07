@@ -21,7 +21,7 @@ execution:
         command: [ls, -la]
 scheduler:
   capacity_provider: fixed
-  max_parallel: 2
+  max_parallel: 1
   poll_interval_s: 0.1
   config: {slots: 2}
 """
@@ -91,4 +91,3 @@ scheduler:
         for item in checks
     )
     assert not (tmp_path / "work" / ".reg" / "context.json").exists()
-
