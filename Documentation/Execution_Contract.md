@@ -68,7 +68,10 @@ local execution resources; MB does not follow handed-off external work.
 
 The adapter records returncode, timed_out, or launch_error as execution evidence.
 These do not automatically become TestResult. Every returned execution is saved
-immediately in jobs/<job>/execution.json and in the run's executions.json snapshot.
+immediately in jobs/<job>/execution.json, the authoritative execution record.
+The run's executions.json is a derived snapshot written once when run exits,
+including graceful interruption and executor errors. It can be missing or stale
+after a write failure; collect reads the per-Job records, not this snapshot.
 An executor/plugin exception is recorded too; it may stop further dispatch.
 Already saved records survive that error. Unexecuted Jobs remain uncollected.
 
@@ -154,9 +157,11 @@ Each collect call performs one sweep, in selected Job order:
 No executor is rerun. No resident polling loop or background monitor is added.
 all performs one execution cycle followed by one collection sweep.
 
-collection.json is the authoritative per-Job checkpoint, saved atomically after
-each attempt. Final results survive an interrupted collect; the next collect
-rebuilds result.json from that checkpoint. Collector logs use unique names per
+jobs/<job>/collection.json is the authoritative per-Job checkpoint, saved
+atomically after each attempt. Final results survive an interrupted collect;
+the next collect rebuilds the run-level collection.json and result.json views
+from these checkpoints. Those views may be absent or stale until a sweep finishes.
+Collector logs use unique names per
 attempt. Concurrent collect calls for the same run are rejected using a file lock.
 A crash after an external collector runs but before its checkpoint is written can
 repeat that call; project collectors should therefore be safe to call again.
@@ -177,9 +182,11 @@ The hard dispatch gate remains min(max_parallel, available_slots()), reserving
 locally in-flight executions. Asynchronous capacity providers must account for
 already handed-off external work. Existing work is not killed when capacity falls.
 
-Plan, run, collection, and result evidence use schema version 2. Old plans must
-be regenerated. Old runs are not silently reinterpreted; collect them using the
-version that created them. Replace old collect.mode: exit-code with an explicit
+Plan, run, collection, and result evidence use schema version 2. New run records
+declare checkpoint_storage: per-job. Existing schema-2 runs without that marker
+retain their original aggregate execution and collection checkpoints; collection
+supports them without migrating or rerunning completed Jobs. Older schemas must
+be collected with the version that created them. Replace old collect.mode: exit-code with an explicit
 project collector, or choose no-check if result judgement is not required.
 
 Custom Python ExecutionAdapter remains an advanced escape hatch. See

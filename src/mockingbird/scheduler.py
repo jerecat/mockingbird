@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import time
-from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
 
 from .models import Job, JobExecution
+from .validation import capacity_slots, positive_seconds
 
 
 def validate_max_parallel(value) -> None:
@@ -33,33 +34,13 @@ def run_jobs(
     """
 
     validate_max_parallel(max_parallel)
-    pending = list(jobs)
-    running = set()
+    positive_seconds(poll_interval_s, "scheduler.poll_interval_s")
     results: list[JobExecution] = []
-
-    with ThreadPoolExecutor(max_workers=max_parallel) as pool:
-        while pending or running:
-            external_limit = max(0, int(capacity.available_slots()))
-            allowed_running = min(max_parallel, external_limit)
-            submissions = min(
-                max(0, allowed_running - len(running)),
-                len(pending),
-            )
-
-            for _ in range(submissions):
-                job = pending.pop(0)
-                running.add(pool.submit(execute, job))
-
-            if running:
-                done, not_done = wait(
-                    running,
-                    timeout=poll_interval_s,
-                    return_when=FIRST_COMPLETED,
-                )
-                running = not_done
-                results.extend(future.result() for future in done)
-            elif pending:
+    # One worker is intentional: SIGINT stops dispatch in the main thread,
+    # while context-manager shutdown drains the current Job and its evidence.
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        for job in jobs:
+            while capacity_slots(capacity.available_slots()) == 0:
                 time.sleep(poll_interval_s)
-
-    by_id = {execution.job_id: execution for execution in results}
-    return [by_id[job.id] for job in jobs]
+            results.append(pool.submit(execute, job).result())
+    return results

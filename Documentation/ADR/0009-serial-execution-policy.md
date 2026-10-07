@@ -9,7 +9,7 @@ Parallel execution is not normally needed. Introducing it into normal operation
 would require deciding how ordering and dependencies are represented, adding
 complexity that is not justified by the present use case.
 
-The existing scheduler already supports max_parallel. The existence of that
+The original scheduler supported max_parallel. The existence of that
 implementation must not be mistaken for a requirement to use or expand it.
 
 ## Decision
@@ -46,7 +46,10 @@ The list and local command completion define current execution order. Capacity
 remains a hard dispatch gate, including when it temporarily reports zero.
 
 This extends ADR 0008 with an enforced serial-only policy. The existing scheduler
-machinery is retained, but parallel execution is disabled. User definitions and
+implementation now dispatches one Job and waits before considering the next.
+One worker thread is retained so graceful SIGINT can drain the current Job and
+save its evidence; Future sets, submission arithmetic and evidence locks are
+unnecessary. User definitions and
 previously prepared contexts requesting another value fail explicitly.
 Tests verify rejection and serial capacity gating. Bundled examples and
 integration guidance use max_parallel: 1.

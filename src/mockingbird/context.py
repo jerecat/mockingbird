@@ -10,6 +10,7 @@ from . import __version__
 from .io import read_json, write_json
 from .plugins import load_source_provider
 from .scheduler import validate_max_parallel
+from .validation import positive_seconds
 
 
 def _now() -> str:
@@ -94,9 +95,7 @@ def validate_definition(defn: dict[str, Any]) -> None:
     if not isinstance(scheduler, dict) or not scheduler.get("capacity_provider"):
         raise ValueError("scheduler.capacity_provider is required")
     validate_max_parallel(scheduler.get("max_parallel", 1))
-    poll_interval_s = float(scheduler.get("poll_interval_s", 1.0))
-    if poll_interval_s <= 0:
-        raise ValueError("scheduler.poll_interval_s must be > 0")
+    positive_seconds(scheduler.get("poll_interval_s", 1.0), "scheduler.poll_interval_s")
 
 
 def provisional_context(defn: dict[str, Any]) -> dict[str, Any]:
@@ -136,6 +135,10 @@ def prepare(defn: dict[str, Any]) -> dict[str, Any]:
 
     for path in (workspace, sources_root, adapter_workdir, metadata, run_root):
         path.mkdir(parents=True, exist_ok=True)
+
+    # Fail closed before touching mutable sources. A failed prepare must never
+    # leave the previous plan executable against partially updated sources.
+    write_json(metadata / "preparing.json", {"started_at": _now()})
 
     sources = list(defn.get("sources", []))
     resolved_sources: list[dict[str, Any]] = []
@@ -180,14 +183,24 @@ def prepare(defn: dict[str, Any]) -> dict[str, Any]:
     }
     write_json(metadata / "context.json", context)
     write_json(metadata / "state.json", {"prepared_at": context["prepared_at"]})
+    (metadata / "preparing.json").unlink()
     return context
 
 
 def load_context(defn: dict[str, Any]) -> dict[str, Any]:
+    if (metadata_path(defn) / "preparing.json").exists():
+        raise RuntimeError("prepare is incomplete; run 'mockingbird prepare' again")
     path = metadata_path(defn) / "context.json"
     if not path.exists():
         raise RuntimeError("context not prepared; run 'mockingbird prepare' first")
-    return read_json(path)
+    context = read_json(path)
+    validate_definition_identity(defn, context)
+    return context
+
+
+def validate_definition_identity(defn: dict[str, Any], context: dict[str, Any]) -> None:
+    if Path(context["definition_path"]).resolve() != Path(defn["_definition_path"]).resolve():
+        raise RuntimeError("saved context belongs to a different definition; use its definition or prepare this one explicitly")
 
 
 def update_state(defn: dict[str, Any], **values: Any) -> dict[str, Any]:

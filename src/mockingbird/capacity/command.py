@@ -5,6 +5,7 @@ from typing import Any
 
 from mockingbird.contracts import CapacityProvider
 from mockingbird.models import CheckResult
+from mockingbird.validation import positive_seconds
 
 
 class Provider(CapacityProvider):
@@ -21,7 +22,7 @@ class Provider(CapacityProvider):
         ):
             raise ValueError("capacity command must be a non-empty list of strings")
         self._command = command
-        self._timeout_s = float(config.get("timeout_s", 10.0))
+        self._timeout_s = positive_seconds(config.get("timeout_s", 10.0), "capacity timeout_s")
 
     def probe(self):
         try:

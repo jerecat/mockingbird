@@ -4,13 +4,12 @@ from typing import Any
 
 from mockingbird.contracts import CapacityProvider
 from mockingbird.models import CheckResult
+from mockingbird.validation import capacity_slots
 
 
 class Provider(CapacityProvider):
     def __init__(self, config: dict[str, Any]):
-        self._slots = int(config.get("slots", 1))
-        if self._slots < 0:
-            raise ValueError("capacity slots must be >= 0")
+        self._slots = capacity_slots(config.get("slots", 1))
 
     def probe(self):
         return [

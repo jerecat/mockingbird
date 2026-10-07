@@ -142,9 +142,12 @@ $PWD/
       plan.json
       run.json
       executions.json
+      collection.json
       result.json
       jobs/
         <safe-job-directory>/
+          execution.json
+          collection.json
           work/
           artifacts/
           logs/
@@ -154,6 +157,11 @@ $PWD/
 
 Job IDs are never trusted directly as filesystem paths; core allocates a safe,
 deterministic directory name per selected Job.
+
+For new runs, per-Job execution/collection files are the recovery checkpoints;
+run-level JSON files are derived views. A failed prepare blocks setup/plan/run
+until prepare succeeds again. Do not overlap prepare/setup/run in one workspace.
+See [ADR 0010](Documentation/ADR/0010-checkpoint-ownership-and-prepare-validity.md).
 
 ## Lifecycle
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 import signal
 import subprocess
@@ -33,6 +34,7 @@ def _log_paths(execution: ExecutionContext, log_name: str | None) -> tuple[Path,
 
 
 def _terminate_process_group(process: subprocess.Popen, grace_s: float) -> None:
+    deadline = time.monotonic() + grace_s
     try:
         os.killpg(process.pid, signal.SIGTERM)
     except ProcessLookupError:
@@ -40,9 +42,16 @@ def _terminate_process_group(process: subprocess.Popen, grace_s: float) -> None:
         return
     try:
         process.wait(timeout=grace_s)
-        return
     except subprocess.TimeoutExpired:
         pass
+    # Parent exit is not proof of group exit. Give surviving group members
+    # the remaining grace period, then kill the group even if parent exited.
+    while time.monotonic() < deadline:
+        try:
+            os.killpg(process.pid, 0)
+        except ProcessLookupError:
+            return
+        time.sleep(min(0.01, max(0, deadline - time.monotonic())))
     try:
         os.killpg(process.pid, signal.SIGKILL)
     except ProcessLookupError:
@@ -71,9 +80,9 @@ def run_process(
     args = [str(item) for item in argv]
     if not args:
         raise ValueError("argv must not be empty")
-    if timeout_s is not None and timeout_s <= 0:
+    if timeout_s is not None and (isinstance(timeout_s, bool) or not math.isfinite(timeout_s) or timeout_s <= 0):
         raise ValueError("timeout_s must be > 0")
-    if terminate_grace_s < 0:
+    if isinstance(terminate_grace_s, bool) or not math.isfinite(terminate_grace_s) or terminate_grace_s < 0:
         raise ValueError("terminate_grace_s must be >= 0")
 
     stdout_path, stderr_path = _log_paths(execution, log_name)
@@ -101,6 +110,9 @@ def run_process(
             timed_out = True
             _terminate_process_group(process, terminate_grace_s)
             returncode = process.returncode
+        except BaseException:
+            _terminate_process_group(process, terminate_grace_s)
+            raise
 
     return ProcessResult(
         returncode=int(returncode),

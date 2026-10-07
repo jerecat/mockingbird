@@ -4,20 +4,20 @@ import hashlib
 import json
 import re
 import time
-from threading import Lock
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .context import load_context, load_state, metadata_path, update_state
+from .context import load_context, load_state, metadata_path, update_state, validate_definition_identity
 from .io import collection_lock, read_json, write_json
-from .models import CollectionAttempt, ExecutionContext, Job, JobExecution, TestResult
+from .models import ExecutionContext, Job, JobExecution, TestResult
 from .plugins import load_adapter, load_capacity_provider
 from .scheduler import run_jobs, validate_max_parallel
 from .selection import Selection, select_jobs
+from .validation import FINAL_STATUSES, bind_execution, positive_seconds, validate_jobs, validate_outcome
 
 
-_CANONICAL_STATUSES = {"PASS", "FAIL", "ERROR", "SKIP"}
+_CANONICAL_STATUSES = FINAL_STATUSES
 
 
 def _now() -> str:
@@ -38,27 +38,6 @@ def _components(defn: dict[str, Any]):
         str(scheduler["capacity_provider"]), dict(scheduler.get("config", {}))
     )
     return context, adapter, capacity
-
-
-def _validate_job_id(job_id: str) -> None:
-    if not isinstance(job_id, str) or not job_id:
-        raise ValueError("job ID must be a non-empty string")
-    if job_id != job_id.strip():
-        raise ValueError(f"job ID must not have leading/trailing whitespace: {job_id!r}")
-    if len(job_id) > 512:
-        raise ValueError(f"job ID is too long (>512 characters): {job_id[:80]!r}...")
-    if any(ord(ch) < 32 or ord(ch) == 127 for ch in job_id):
-        raise ValueError(f"job ID must not contain control characters: {job_id!r}")
-
-
-def _validate_jobs(jobs: list[Job]) -> None:
-    ids: list[str] = []
-    for job in jobs:
-        _validate_job_id(job.id)
-        json.dumps(job.to_dict())
-        ids.append(job.id)
-    if len(ids) != len(set(ids)):
-        raise ValueError("adapter returned duplicate job IDs")
 
 
 def _job_directory_name(index: int, job_id: str) -> str:
@@ -103,7 +82,7 @@ def create_plan(defn: dict[str, Any]) -> dict[str, Any]:
     plan_path = metadata_path(defn) / "plan.json"
     try:
         jobs = adapter.plan(context)
-        _validate_jobs(jobs)
+        validate_jobs(jobs)
     except Exception:
         plan_path.unlink(missing_ok=True)
         raise
@@ -154,6 +133,7 @@ def run(
     selection = selection or Selection()
     context, adapter, capacity = _components(defn)
     validate_max_parallel(context["scheduler"]["max_parallel"])
+    positive_seconds(context["scheduler"]["poll_interval_s"], "scheduler.poll_interval_s")
     plan = load_plan(defn)
     jobs = [Job(**item) for item in plan["jobs"]]
     selected, selection_meta = select_jobs(jobs, selection)
@@ -173,6 +153,7 @@ def run(
     run_record = {
         "schema_version": 2,
         "run_id": run_id,
+        "checkpoint_storage": "per-job",
         "name": context["name"],
         "status": "RUNNING",
         "started_at": _now(),
@@ -194,9 +175,7 @@ def run(
     scheduler = context["scheduler"]
     started = time.monotonic()
 
-    completed: dict[str, JobExecution] = {}
-    evidence_lock = Lock()
-    write_json(run_dir / "executions.json", [])
+    completed: list[JobExecution] = []
 
     def execute(job: Job) -> JobExecution:
         execution_context = execution_contexts[job.id]
@@ -205,21 +184,15 @@ def run(
         error = None
         try:
             result = adapter.execute(context, job, execution_context)
-            if result.job_id != job.id:
-                raise ValueError(f"adapter returned execution for {result.job_id!r}; expected {job.id!r}")
-            json.dumps(result.to_dict(), allow_nan=False)
+            bind_execution(result, job, execution_context)
         except Exception as exc:
             error = exc
             result = JobExecution(job.id, job_started, _now(), time.monotonic() - began,
                                   observation={"executor_error": f"{type(exc).__name__}: {exc}"})
-        result.paths = execution_context.evidence_paths()
-        result.contract = job.to_dict()
-        result.run_id = run_id
+            bind_execution(result, job, execution_context)
         # Persist each returned execution before the scheduler consumes it.
         write_json(Path(execution_context.job_dir) / "execution.json", result.to_dict())
-        with evidence_lock:
-            completed[job.id] = result
-            write_json(run_dir / "executions.json", [completed[j.id].to_dict() for j in selected if j.id in completed])
+        completed.append(result)
         if error is not None:
             raise error
         return result
@@ -230,9 +203,8 @@ def run(
             execute,
             capacity,
             scheduler["max_parallel"],
-            float(scheduler["poll_interval_s"]),
+            scheduler["poll_interval_s"],
         )
-        write_json(run_dir / "executions.json", [item.to_dict() for item in executions])
         run_record["status"] = "EXECUTED"
         return_value = executions
     except KeyboardInterrupt:
@@ -258,6 +230,8 @@ def run(
             last_run_dir=str(run_dir.resolve()),
             last_run_at=run_record["finished_at"],
         )
+        # Derived view only; collection never depends on its successful write.
+        write_json(run_dir / "executions.json", [item.to_dict() for item in completed])
 
     return return_value, run_dir, selection_meta
 
@@ -289,18 +263,7 @@ def _validate_results(
         raise ValueError(f"adapter result IDs do not match executions; missing={missing}, extra={extra}")
 
     for test in tests:
-        test.status = str(test.status).upper()
-        if test.status not in _CANONICAL_STATUSES:
-            raise ValueError(
-                f"adapter returned invalid status {test.status!r} for test {test.id!r}"
-            )
-        if not isinstance(test.artifacts, list) or any(
-            not isinstance(item, str) for item in test.artifacts
-        ):
-            raise ValueError(
-                f"adapter returned invalid artifacts for test {test.id!r}; expected list[str]"
-            )
-        json.dumps(test.to_dict())
+        validate_outcome(test, test.id)
     return tests
 
 
@@ -314,21 +277,35 @@ def collect(
 
 def _collect_locked(defn, run_path):
     context = read_json(run_path / "context.json")
+    validate_definition_identity(defn, context)
     run_record = read_json(run_path / "run.json")
     if run_record.get("status") not in {"EXECUTED", "COLLECTED", "ERROR", "INTERRUPTED"}:
         raise RuntimeError(f"run is not collectable; status={run_record.get('status')!r}: {run_path}")
     if run_record.get("schema_version") != 2:
         raise RuntimeError("run schema is obsolete; use the previous version to collect this run")
-    executions = [JobExecution(**item) for item in read_json(run_path / "executions.json")]
-    by_id = {item.job_id: item for item in executions}
+    per_job = run_record.get("checkpoint_storage") == "per-job"
     selected = run_record["selection"]["selected_ids"]
+    job_dirs = {job_id: run_path / run_record["jobs"][job_id]["job_dir"] for job_id in selected}
+    if per_job:
+        executions = []
+        for job_id in selected:
+            path = job_dirs[job_id] / "execution.json"
+            if path.exists():
+                item = JobExecution(**read_json(path))
+                if item.job_id != job_id:
+                    raise ValueError("execution ID does not match its Job directory")
+                executions.append(item)
+    else:
+        # Existing schema-2 runs retain their original checkpoint format.
+        executions = [JobExecution(**item) for item in read_json(run_path / "executions.json")]
+    by_id = {item.job_id: item for item in executions}
     if len(by_id) != len(executions) or not set(by_id).issubset(selected):
         raise ValueError("execution IDs do not match the run")
     if any(item.run_id != run_record["run_id"] for item in executions):
         raise ValueError("execution belongs to another run")
 
     journal_path = run_path / "collection.json"
-    if journal_path.exists():
+    if not per_job and journal_path.exists():
         journal = read_json(journal_path)
         if journal["run_id"] != run_record["run_id"] or set(journal["jobs"]) != set(selected):
             raise ValueError("collection journal does not match the run")
@@ -336,6 +313,14 @@ def _collect_locked(defn, run_path):
         journal = {"schema_version": 2, "run_id": run_record["run_id"], "jobs": {
             job_id: {"state": "UNCOLLECTED", "attempts": 0} for job_id in selected
         }}
+    if per_job:
+        for job_id in selected:
+            path = job_dirs[job_id] / "collection.json"
+            if path.exists():
+                checkpoint = read_json(path)
+                if checkpoint["run_id"] != run_record["run_id"] or checkpoint["job_id"] != job_id:
+                    raise ValueError("collection checkpoint does not match the run or Job")
+                journal["jobs"][job_id] = checkpoint["entry"]
     adapter = load_adapter(str(context["execution"]["adapter"]))
     for job_id in selected:
         entry = journal["jobs"][job_id]
@@ -348,28 +333,23 @@ def _collect_locked(defn, run_path):
             if len(outcomes) != 1 or outcomes[0].id != job_id:
                 raise ValueError("collector must return exactly one outcome for the requested Job ID")
             outcome = outcomes[0]
+            validate_outcome(outcome, job_id)
             if isinstance(outcome, TestResult):
-                _validate_results([execution], [outcome])
                 entry = {"state": "COMPLETE", "result": outcome.to_dict()}
-            elif isinstance(outcome, CollectionAttempt):
-                if outcome.state not in {"PENDING", "ERROR"}:
-                    raise ValueError("invalid collection state")
-                if not isinstance(outcome.artifacts, list) or any(not isinstance(v, str) for v in outcome.artifacts):
-                    raise ValueError("collection artifacts must be list[str]")
-                if outcome.reason is not None and not isinstance(outcome.reason, str):
-                    raise ValueError("collection reason must be a string or null")
-                entry = outcome.to_dict()
             else:
-                raise ValueError("collector returned an invalid outcome type")
+                entry = outcome.to_dict()
             json.dumps(entry, allow_nan=False)
         except Exception as exc:
             entry = {"state": "ERROR", "reason": f"{type(exc).__name__}: {exc}"}
         entry.update(attempts=attempts, updated_at=_now())
         journal["jobs"][job_id] = entry
-        # This is the authoritative checkpoint, including final results.
-        write_json(journal_path, journal)
-    if not journal_path.exists():
-        write_json(journal_path, journal)
+        if per_job:
+            write_json(job_dirs[job_id] / "collection.json", {
+                "run_id": run_record["run_id"], "job_id": job_id, "entry": entry})
+        else:
+            write_json(journal_path, journal)
+    # Derived view for new runs, authoritative checkpoint for legacy runs.
+    write_json(journal_path, journal)
 
     tests = [TestResult(**journal["jobs"][job_id]["result"]) for job_id in selected
              if journal["jobs"][job_id]["state"] == "COMPLETE"]

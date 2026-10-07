@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 import json
-import math
 import os
 import shutil
 from datetime import datetime, timezone
@@ -13,6 +12,7 @@ from uuid import uuid4
 from mockingbird.adapter_utils import result_from_execution, run_process
 from mockingbird.contracts import ExecutionAdapter
 from mockingbird.models import CollectionAttempt, CheckResult, ExecutionContext, Job, JobExecution
+from mockingbird.validation import positive_seconds
 
 
 _FINAL_STATUSES = {"PASS", "FAIL", "ERROR", "SKIP"}
@@ -45,11 +45,7 @@ def _argv(value, field, *, empty=False):
 def _timeout(value, field):
     if value is None:
         raise ValueError(f"{field} is required")
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise ValueError(f"{field} must be a finite positive number")
-    if not math.isfinite(value) or value <= 0:
-        raise ValueError(f"{field} must be a finite positive number")
-    return float(value)
+    return positive_seconds(value, field)
 
 
 def _collector(value, job_id):

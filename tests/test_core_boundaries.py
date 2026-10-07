@@ -15,6 +15,7 @@ CORE_FILES = [
     "selection.py",
     "cli.py",
     "doctor.py",
+    "validation.py",
 ]
 
 

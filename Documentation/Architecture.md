@@ -266,6 +266,8 @@ list-ordered and capacity-gated; there is no dependency graph.
 Execution records are saved per Job as they return. Collection state is distinct
 from execution evidence and final TestResult. CollectionAttempt carries PENDING
 or ERROR when no final judgement is available. Repeated collect checkpoints
-only unresolved Jobs; final results remain unchanged. collection.json is the
-checkpoint and result.json is its user-facing snapshot. An incomplete selected
-set has aggregate status PENDING, never PASS. See ADR 0008.
+only unresolved Jobs; final results remain unchanged. Job-level execution.json
+and collection.json are authoritative checkpoints. Run-level executions.json,
+collection.json and result.json are derived views, not recovery inputs for new
+runs. An incomplete selected set has aggregate status PENDING, never PASS.
+See ADR 0008 and ADR 0010 for checkpoint ownership and legacy compatibility.

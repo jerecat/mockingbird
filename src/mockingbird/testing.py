@@ -6,9 +6,7 @@ from typing import Any
 
 from .contracts import CapacityProvider, ExecutionAdapter, SourceProvider
 from .models import CollectionAttempt, CheckResult, ExecutionContext, JobExecution
-
-
-_CANONICAL_STATUSES = {"PASS", "FAIL", "ERROR", "SKIP"}
+from .validation import bind_execution, capacity_slots, validate_jobs, validate_outcome
 
 
 def _result(component: str, name: str, fn) -> CheckResult:
@@ -20,7 +18,7 @@ def _result(component: str, name: str, fn) -> CheckResult:
 
 
 def _assert_json(value: Any) -> None:
-    json.dumps(value)
+    json.dumps(value, allow_nan=False)
 
 
 def make_execution_context(root: str | Path, job_id: str = "conformance") -> ExecutionContext:
@@ -69,16 +67,12 @@ def check_execution_adapter(
         nonlocal first_jobs, second_jobs
         first_jobs = adapter.plan(context)
         second_jobs = adapter.plan(context)
+        validate_jobs(first_jobs)
+        validate_jobs(second_jobs)
         ids = [job.id for job in first_jobs]
         ids2 = [job.id for job in second_jobs]
-        if len(ids) != len(set(ids)):
-            raise AssertionError("plan returned duplicate job IDs")
         if ids != ids2:
             raise AssertionError("job IDs changed between two plan() calls under the same context")
-        for job in first_jobs:
-            if not isinstance(job.id, str) or not job.id or job.id != job.id.strip():
-                raise AssertionError(f"invalid job ID: {job.id!r}")
-            _assert_json(job.to_dict())
         return f"plan stable with {len(ids)} job(s)", {"job_ids": ids}
 
     checks.append(_result("execution", "plan-contract", plan_contract))
@@ -91,11 +85,7 @@ def check_execution_adapter(
         def execute_contract():
             nonlocal captured
             captured = adapter.execute(context, sample, execution_context)
-            if captured.job_id != sample.id:
-                raise AssertionError(
-                    f"execute returned job_id={captured.job_id!r}; expected {sample.id!r}"
-                )
-            captured.paths = execution_context.evidence_paths()
+            bind_execution(captured, sample, execution_context)
             _assert_json(captured.to_dict())
             return "sample execute returned serializable JobExecution", {}
 
@@ -107,21 +97,10 @@ def check_execution_adapter(
             results = adapter.collect(context, [captured])
             if len(results) != 1 or results[0].id != sample.id:
                 raise AssertionError("collect must return exactly one result for the sample execution")
+            validate_outcome(results[0], sample.id)
             if isinstance(results[0], CollectionAttempt):
-                if results[0].state not in {"PENDING", "ERROR"}:
-                    raise AssertionError("invalid collection state")
-                if not isinstance(results[0].artifacts, list) or any(not isinstance(v, str) for v in results[0].artifacts):
-                    raise AssertionError("artifacts must be list[str]")
-                _assert_json(results[0].to_dict())
                 return "sample collect returned unresolved state", {"state": results[0].state}
             status = str(results[0].status).upper()
-            if status not in _CANONICAL_STATUSES:
-                raise AssertionError(f"non-canonical status: {status!r}")
-            if not isinstance(results[0].artifacts, list) or any(
-                not isinstance(item, str) for item in results[0].artifacts
-            ):
-                raise AssertionError("artifacts must be list[str]")
-            _assert_json(results[0].to_dict())
             return f"sample collect returned {status}", {"status": status}
 
         checks.append(_result("execution", "collect-contract", collect_contract))
@@ -154,10 +133,8 @@ def check_capacity_provider(provider: CapacityProvider) -> list[CheckResult]:
 
     def capacity_contract():
         values = [provider.available_slots(), provider.available_slots()]
-        if any(isinstance(value, bool) or not isinstance(value, int) for value in values):
-            raise AssertionError(f"available_slots must return int, got {values!r}")
-        if any(value < 0 for value in values):
-            raise AssertionError(f"available_slots must be >= 0, got {values!r}")
+        for value in values:
+            capacity_slots(value)
         return f"two valid capacity samples: {values}", {"samples": values}
 
     checks.append(_result("capacity", "contract", capacity_contract))
@@ -169,4 +146,3 @@ def assert_conformance(checks: list[CheckResult]) -> None:
     if failures:
         details = "; ".join(f"{item.component}/{item.name}: {item.message}" for item in failures)
         raise AssertionError(details)
-

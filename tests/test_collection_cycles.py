@@ -74,7 +74,8 @@ def test_completed_checkpoint_survives_interrupted_collect(tmp_path, monkeypatch
     monkeypatch.setattr(lifecycle, "load_adapter", lambda _: adapter)
     with pytest.raises(KeyboardInterrupt):
         lifecycle.collect(defn, run)
-    assert read_json(run / "collection.json")["jobs"]["a"]["state"] == "COMPLETE"
+    checkpoint = next(run.glob("jobs/*a_*/collection.json"))
+    assert read_json(checkpoint)["entry"]["state"] == "COMPLETE"
     monkeypatch.setattr(adapter, "collect", original)
     result, _ = lifecycle.collect(defn, run)
     assert result["status"] == "PASS"
@@ -87,7 +88,7 @@ def test_execution_evidence_is_saved_before_next_job_and_survives_error(tmp_path
     original = adapter.execute
     def execute(context, job, execution):
         if job.id == "b":
-            recorded = read_json(Path(execution.run_dir) / "executions.json")
+            recorded = [read_json(p) for p in sorted(Path(execution.run_dir).glob("jobs/*/execution.json"))]
             assert [item["job_id"] for item in recorded] == ["a"]
             raise RuntimeError("executor broken")
         return original(context, job, execution)

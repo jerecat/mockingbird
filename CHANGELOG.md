@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Reject workspace/definition mismatches and block execution after partial prepare.
+- Make per-Job execution and collection files authoritative; retain legacy
+  schema-2 checkpoint compatibility and write aggregate views once per cycle.
+- Share runtime/conformance validation and execution enrichment; reject invalid
+  numeric boundaries before dispatch instead of coercing capacity values.
+- Simplify serial scheduling while retaining graceful SIGINT drain behaviour.
+- Terminate surviving process-group members even after parent exit, and clean up
+  interrupted collector processes before propagating interruption.
+
 - Enforce max_parallel as integer 1 in configuration and runtime, including old
   prepared contexts; reject parallel execution instead of silently clamping it.
 - Align all bundled definitions and integration guidance with serial operation.
