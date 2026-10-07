@@ -1,12 +1,13 @@
-# 模擬シミュレーション接続チュートリアル
+# Mock Simulation Integration Tutorial
 
-simv・ライセンス・外部キューは不要です。小さなテキストファイルだけを作り、
-ユーザーシステムのrunとcollectorをMockingbirdに接続する流れを体験します。
-追加のソースcloneは行いません。
+No simv, simulator licence or external queue is required. This tutorial creates
+small text files to demonstrate how to connect a user-owned execution command
+and collector to Mockingbird. No additional source repositories are cloned.
 
-## 1. 準備
+## 1. Prepare your environment
 
-Mockingbirdのリポジトリ直下で実行します。インストール済みなら環境を有効化するだけです。
+Run these commands from the Mockingbird repository root. If Mockingbird is already
+installed in your virtual environment, just activate it.
 
 ```sh
 python3 -m venv .venv
@@ -14,17 +15,18 @@ source .venv/bin/activate
 python -m pip install -e .
 ```
 
-| ファイル | 担当 |
+| File | Responsibility |
 | --- | --- |
-| `examples/sample-collector.yaml` | Jobと実行／回収コマンドの接続 |
-| `examples/sample_run.py` | 模擬simv。ユーザー側のファイルを作る |
-| `examples/sample_collect.py` | ファイルから判定し、artifact付きJSONを標準出力に返す |
-| `examples/sample_finish.py` | 外部処理の完了と回収サービスの復旧を模擬する |
+| `examples/sample-collector.yaml` | Connect Jobs to execution and collection commands |
+| `examples/sample_run.py` | Stand in for simv and create project-owned files |
+| `examples/sample_collect.py` | Interpret files and print judgement JSON with artifact references |
+| `examples/sample_finish.py` | Simulate external completion and collection service recovery |
 
-runもcollectorも、環境変数`MB_RUN_ID`と`MB_JOB_ID`で対象を特定します。
-この例はargvではなく環境変数を使うため、YAMLの`args`は空です。
+Both execution and collection identify their target through the `MB_RUN_ID` and
+`MB_JOB_ID` environment variables. This example uses these variables rather than
+command-line arguments, so `args` is empty in the YAML definition.
 
-## 2. 計画して実行する
+## 2. Plan and execute
 
 ```sh
 mb doctor examples/sample-collector.yaml
@@ -34,15 +36,15 @@ mb plan examples/sample-collector.yaml
 mb run examples/sample-collector.yaml
 ```
 
-8件がリスト順に実行されます。表示された`run:`のパスの最後の部分をコピーします。
-以下の例のIDは、自分の実行で表示された値に置き換えてください。
+Eight Jobs execute in list order. Copy the final directory name from the printed
+`run:` path. Replace the example ID below with the ID from your own run.
 
 ```sh
 RUN_ID=20261007_140000_000000_sample-collector
 RUN_DIR="runs/sample-collector/$RUN_ID"
 ```
 
-## 3. ユーザー側の生成ファイルを見る
+## 3. Inspect the project-owned files
 
 ```sh
 ls "work/sample-results/$RUN_ID/test_pass"
@@ -51,14 +53,16 @@ cat "work/sample-results/$RUN_ID/test_fail/result.txt"
 cat "work/sample-results/$RUN_ID/test_pass/sim.log"
 ```
 
-各Jobに`result.txt`、`tarmac.log`、`wave.fsdb`、`sim.log`ができます。
-すべて模擬テキストです。`wave.fsdb`は波形ビューアで開けるFSDBではありません。
-完了したJobには`done`もあります。`test_pending`にはまだありません。
+Each Job creates `result.txt`, `tarmac.log`, `wave.fsdb` and `sim.log`.
+All four are mock text files. `wave.fsdb` is not a valid FSDB file and cannot be
+opened as a waveform in a waveform viewer. Completed Jobs also have a `done`
+marker; `test_pending` does not have one yet.
 
-この時点ではユーザー側runはJSONを作っていません。`result.txt`は単なる
-PASS／FAIL／ERROR／SKIPの文字列です。実行コマンド自体は全件終了コード0で戻ります。
+The user-owned execution script has not created any JSON. `result.txt` contains
+only a plain-text PASS, FAIL, ERROR or SKIP verdict. Every execution command
+returns exit code 0, independently of that verdict.
 
-## 4. 初回の結果回収
+## 4. Collect results for the first time
 
 ```sh
 mb collect examples/sample-collector.yaml --run-dir "$RUN_DIR"
@@ -66,29 +70,30 @@ echo $?
 mb status examples/sample-collector.yaml --run-dir "$RUN_DIR"
 ```
 
-| Job | 初回の結果 | 意味 |
+| Job | First outcome | Meaning |
 | --- | --- | --- |
-| test_pass | PASS | 正常判定 |
-| test_fail | FAIL | 模擬scoreboard不一致 |
-| test_error | ERROR | 模擬simulator fatal。確定済みの判定 |
-| test_skip | SKIP | 対象外の構成 |
-| test_pending | PENDING | 完了待ち |
-| test_collect_error | collection_error | collectorが終了コード7で異常終了 |
-| test_bad_json | collection_error | collectorの出力が不正JSON |
-| test_no_check | PASS | collectorを呼ばず、判定を省略 |
+| test_pass | PASS | Successful test judgement |
+| test_fail | FAIL | Mock scoreboard mismatch |
+| test_error | ERROR | Mock simulator fatal error; a final judgement |
+| test_skip | SKIP | Unsupported configuration |
+| test_pending | PENDING | Waiting for completion |
+| test_collect_error | collection_error | Collector exits with code 7 |
+| test_bad_json | collection_error | Collector returns invalid JSON |
+| test_no_check | PASS | Judgement omitted; no collector is called |
 
-期待値は`total=8, pass=2, fail=1, error=1, skip=1, pending=1,
-uncollected=0, collection_error=2`です。
+Expected counts: `total=8, pass=2, fail=1, error=1, skip=1, pending=1,
+uncollected=0, collection_error=2`.
 
-未確定があるため全体はPENDING、collectの終了コードは **2** です。
-意図した結果なので、コマンドを個別に実行して次へ進んでください。
+Because some outcomes are unresolved, the aggregate status is PENDING and collect
+returns exit code **2**. This is intentional. Run the commands individually and
+continue with the next step.
 
-JSONを作るのは`sample_collect.py`です。Mockingbirdはそれを受け取り、
-Job別の回収記録とrun全体の`result.json`を保存します。
-`artifacts`には上記4ファイルの絶対パスが入り、no-checkでは空になります。
-Mockingbirdはartifact自体をコピーしません。
+`sample_collect.py` creates the JSON. Mockingbird receives it and saves per-Job
+collection records and the run-level `result.json`. The `artifacts` list contains
+absolute paths to the four files above; it is empty for no-check. Mockingbird
+does not copy the artifact files themselves.
 
-## 5. 外部完了・復旧後に、同じsetを再回収する
+## 5. Complete external work, recover the service and collect the same set again
 
 ```sh
 python3 examples/sample_finish.py "$RUN_ID"
@@ -97,15 +102,16 @@ echo $?
 mb status examples/sample-collector.yaml --run-dir "$RUN_DIR"
 ```
 
-finishはユーザー側の完了マーカーと障害マーカーだけを変更します。
-Mockingbirdの記録には触れず、runも再実行しません。
+The finish helper changes only project-owned completion and fault markers.
+It neither changes Mockingbird's records nor repeats execution.
 
-PENDINGと2件の回収エラーがPASSになります。期待値は
-`total=8, pass=5, fail=1, error=1, skip=1`で、未確定件数はすべて0です。
-全件の回収は完了しますが、確定済みのFAIL／ERRORがあるため全体はFAIL、
-終了コードは **1** です。最終ERRORは回収エラーと違い、再試行されません。
+The PENDING Job and both collection-error Jobs now return PASS. Expected counts
+are `total=8, pass=5, fail=1, error=1, skip=1`, with all unresolved counts at zero.
+Collection is complete, but the retained final FAIL and ERROR judgements make
+the aggregate status FAIL and the exit code **1**. Unlike a collection error,
+a final ERROR judgement is not retried.
 
-## 6. 確定済みのcollectorが再実行されないことを確認する
+## 6. Verify that final outcomes are not collected again
 
 ```sh
 wc -l "work/sample-results/$RUN_ID"/*/collector_calls.txt
@@ -113,18 +119,23 @@ mb collect examples/sample-collector.yaml --run-dir "$RUN_DIR"
 wc -l "work/sample-results/$RUN_ID"/*/collector_calls.txt
 ```
 
-確定済みの4件は1行、復旧した3件は2行、no-checkは呼出し記録自体がありません。
-3回目のcollectでは行数が変わりません。このファイルはチュートリアル用の計測です。
+The four Jobs with initially final collector outcomes have one line each. The
+three recovered Jobs have two lines each. The no-check Job has no call record.
+The third collect does not change these counts. This file is tutorial-only
+instrumentation for observing collector calls.
 
-## 7. 実際のユーザーシステムへ置き換える
+## 7. Connect your real system
 
-- `sample_run.py`のファイル作成を、実際のsimv実行や外部キューへの投入に置き換える。
-- `sample_collect.py`の完了確認・判定処理を、実際の結果形式に合わせる。
-- ログ・波形などの参照先を`artifacts`へ返す。
-- `sample_finish.py`と障害マーカー・呼出し回数の計測は模擬体験用なので不要。
+- Replace file creation in `sample_run.py` with actual simv execution or submission
+  to your external queue.
+- Adapt the completion check and verdict parsing in `sample_collect.py` to your
+  project's result format.
+- Return references to logs, waveforms and other evidence in `artifacts`.
+- Remove the tutorial-only finish helper, fault markers and call-count recording.
 
-ファイルの場所、完了マーカー、判定方法はユーザー側の取り決めです。
-Mockingbirdが要求する外部への返却形式はcollectorのJSONです。
+File locations, completion markers and judgement rules are project-owned
+conventions. The return format Mockingbird requires is the collector's JSON.
 
-別の判定を試すときは`mb run`で新しいrunを作ります。確定済みの結果は、
-元ログを書き換えても再collectでは判定し直しません。各runのファイルは別々に残ります。
+Use `mb run` to create a new run when trying a different final verdict. Editing
+the original logs does not cause repeated collect to rejudge final results.
+Each run's files remain in its own directory.

@@ -2,7 +2,7 @@
 
 ## Mock simv: run, collect, artifacts and recovery
 
-Step-by-step Japanese walkthrough: [模擬シミュレーション接続チュートリアル](Tutorial_Mock_Simulation.md).
+Step-by-step walkthrough: [Mock Simulation Integration Tutorial](Tutorial_Mock_Simulation.md).
 
 No simulator, licence, farm or source clone is required. These scripts create
 small text files as a stand-in for a user's simulation system. `wave.fsdb` is
