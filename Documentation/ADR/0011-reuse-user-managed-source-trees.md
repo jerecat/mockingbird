@@ -47,3 +47,7 @@ SourceProviders must document their own materialisation semantics.
 
 An incomplete Git checkout left by an older version is still user-managed.
 Repair it with Git or select a fresh workspace; prepare does not reset it.
+
+The repo provider follows the same reuse rule for existing .repo trees. Initial
+init and sync complete in a temporary sibling before publication; see
+[Repo sources](../Repo_Sources.md) for manifest evidence and explicit updates.

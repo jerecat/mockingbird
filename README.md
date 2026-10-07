@@ -173,7 +173,7 @@ python3 -m pytest -q --ignore=tests/test_cli_aliases.py
 
 This disables automatic loading of third-party pytest plugins and excludes two
 CLI registration tests that import Python 3.11's `tomllib`. The current expected
-result is **241 passed**. This was verified with Python 3.10.19, PyYAML 5.4.1 and
+result is **254 passed**. This was verified with Python 3.10.19, PyYAML 5.4.1 and
 pytest 8.4.2; pytest 9.0.3 has not yet been verified in this combination.
 
 Tests create temporary files in pytest's temporary directory, normally under
@@ -185,6 +185,9 @@ libraries, system commands and Git configuration may be read outside the clone.
 
 Git clone and checkout output is shown live on stderr during prepare, including
 Git progress. No flag is required; `prepare --json` keeps stdout as JSON.
+
+For git-repo XML manifests, see [Repo sources](Documentation/Repo_Sources.md)
+and examples/repo-sources.yaml. Git, SVN and repo sources can coexist.
 
 ## Workspace/run layout
 

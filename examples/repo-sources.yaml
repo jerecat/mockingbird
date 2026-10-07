@@ -1,0 +1,27 @@
+name: repo-example
+workspace: ./work/repo-example
+run_root: ./runs/repo-example
+
+# Replace with your manifest repository. Project paths come from its XML.
+sources:
+  - name: platform
+    provider: repo
+    url: ssh://git.example.invalid/soc/manifests.git
+    revision: main
+    config:
+      manifest: default.xml
+
+execution:
+  defaults:
+    command: [ls, -la]
+    args: []
+    timeout_s: 30
+  jobs:
+    - id: list_platform
+      args: [work/repo-example/sources/platform]
+
+scheduler:
+  capacity_provider: fixed
+  max_parallel: 1
+  config:
+    slots: 1
