@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-import re
 import sys
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -18,6 +17,8 @@ from .plugins import load_source_provider
 from .setup_contract import resolve_setup, setup_required
 from .scheduler import validate_max_parallel
 from .validation import positive_seconds
+from . import registry
+from .registry import plan_name
 
 
 def _now() -> str:
@@ -63,16 +64,11 @@ def _from_invocation(defn: dict[str, Any], value: str) -> Path:
     return p.resolve()
 
 
-def plan_name(value: Any) -> str:
-    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", value):
-        raise ValueError("plan must be 1-128 letters, digits, dots, underscores or hyphens, "
-                         "starting with a letter or digit")
-    return value
-
-
 def plan_target(name: str, directory: str | Path | None = None) -> dict[str, Any]:
-    """Locate a named plan without opening its original YAML."""
-    return {"plan": plan_name(name), "_invocation_dir": str(Path(directory or Path.cwd()).resolve())}
+    """Resolve a registered name; explicit directories also support legacy evidence."""
+    name = plan_name(name)
+    root = registry.resolve(name) if directory is None else Path(directory).resolve()
+    return {"plan": name, "_invocation_dir": str(root)}
 
 
 def workspace_path(defn: dict[str, Any]) -> Path:
@@ -148,6 +144,7 @@ def provisional_context(defn: dict[str, Any]) -> dict[str, Any]:
     """Build a non-frozen context for connection probes only."""
 
     validate_definition(defn)
+    defn = registry.definition_target(defn)
     workspace = workspace_path(defn)
     run_root = run_root_path(defn)
     scheduler = dict(defn["scheduler"])
@@ -184,12 +181,13 @@ def prepared_environment(defn, *, exclusive=False):
 
 def prepare(defn: dict[str, Any]) -> dict[str, Any]:
     validate_definition(defn)
-    metadata_path(defn).mkdir(parents=True, exist_ok=True)
-    with prepared_environment(defn, exclusive=True):
-        existing = metadata_path(defn) / "context.json"
-        if existing.exists():
-            validate_definition_identity(defn, read_json(existing))
-        return _prepare(defn)
+    with registry.registration(defn) as target:
+        metadata_path(target).mkdir(parents=True, exist_ok=True)
+        with prepared_environment(target, exclusive=True):
+            existing = metadata_path(target) / "context.json"
+            if existing.exists():
+                validate_definition_identity(target, read_json(existing))
+            return _prepare(target)
 
 
 def _prepare(defn: dict[str, Any]) -> dict[str, Any]:
@@ -218,7 +216,7 @@ def _prepare(defn: dict[str, Any]) -> dict[str, Any]:
     for source in sources:
         destination = sources_root / str(source["name"])
         provider = load_source_provider(str(source["provider"]))
-        evidence = provider.materialize(source, destination)
+        evidence = provider.materialize(dict(source, _invocation_dir=defn["_invocation_dir"]), destination)
         resolved_sources.append(
             {
                 "name": source["name"],

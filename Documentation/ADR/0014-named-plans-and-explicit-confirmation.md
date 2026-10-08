@@ -2,6 +2,10 @@
 
 Status: accepted, 2026-10-08
 
+The invocation-directory identity and absence of a registry below are superseded
+by [ADR 0015](0015-user-plan-registration.md). The remaining lifecycle and result
+decisions continue to apply.
+
 ## Context
 
 A user writes a plan, confirms it, runs it, checks results, and edits or starts

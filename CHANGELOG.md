@@ -13,6 +13,13 @@
 
 ## Unreleased
 
+- Resolve named plans through a single-user registry, independently of caller
+  cwd; retain original project storage and execution cwd.
+- Register existing prepared plans through explicit confirmation; report unknown
+  names, missing locations and duplicate legacy environments without guessing.
+- Isolate tutorial registrations and preserve explicit external run inspection.
+- Keep run/result formats and latest-started selection unchanged. See ADR 0015.
+
 - Show serial command progress and publish the latest run before dispatch.
 - Show saved execution and collection states in `status`, including before first
   collection and after partial collection; add `status --json` for snapshots.

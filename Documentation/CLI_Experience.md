@@ -29,14 +29,15 @@ phases. Neither `run` nor `collect` automatically prepares a workspace.
 For example, running before preparation reports on stderr:
 
 ```text
-Error: context not prepared
-Required steps:
-  mb prepare '<definition.yaml>'
-  mb plan '<definition.yaml>'
-Then retry your command.
+Error: plan 'sample-collector' is not registered.
+For a new plan, run mb prepare <definition.yaml> from its project directory.
+For an existing local plan, run mb plan <definition.yaml> once from its original project directory.
 ```
 
 Before the first prepare, supply your YAML path in place of `<definition.yaml>`.
+Once registered, named commands resolve the same plan from every directory.
+Unknown names and missing registered locations are errors; an existing plan with
+no runs can still report `No runs yet.` in history. See [Named plans](Named_Plans.md).
 After prepare, recovery commands use the recorded, shell-quoted YAML path. Missing or stale setup/plan also
 produce actionable instructions. Normal errors do not print a Python traceback.
 Use `mb --debug <command> <definition>` (or put `--debug` after the command) to
@@ -64,6 +65,7 @@ use explicit JSON options or saved files. Schema-3 plan.json embeds the original
 input, resolved Jobs and complete execution context. Each run saves that plan.
 No original YAML is needed to inspect or collect the run. Use `status --history`
 to list runs and `status --run <run-id> --plan` to inspect historical contents.
+JSON record schemas and collector outputs are unchanged by name registration.
 
 ```sh
 mb prepare examples/sample-collector.yaml --json > context-copy.json

@@ -57,7 +57,7 @@ class Provider(SourceProvider):
         env["GIT_TERMINAL_PROMPT"] = "0"
         try:
             version = _run(["git", "--version"], env=env)
-            _run(["git", "ls-remote", str(source["url"])], env=env)
+            _run(["git", "ls-remote", str(source["url"])], env=env, cwd=source.get("_invocation_dir"))
         except Exception as exc:
             return [
                 CheckResult(component, "git", "PASS", version if 'version' in locals() else "git found"),
@@ -82,7 +82,8 @@ class Provider(SourceProvider):
             with tempfile.TemporaryDirectory(prefix=f".{destination.name}-clone-",
                                              dir=destination.parent) as staging:
                 checkout = Path(staging) / "checkout"
-                _run(["git", "clone", "--progress", "--no-checkout", url, str(checkout)], stream=True)
+                _run(["git", "clone", "--progress", "--no-checkout", url, str(checkout)],
+                     cwd=source.get("_invocation_dir"), stream=True)
                 resolved = _resolve_revision(checkout, revision)
                 _run(["git", "checkout", "--progress", "--detach", resolved], cwd=checkout, stream=True)
                 # Rename on the same filesystem. Never replace a nonempty tree.

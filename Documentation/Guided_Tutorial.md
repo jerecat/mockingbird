@@ -27,6 +27,13 @@ All commands execute from that new directory. Existing repository workspaces,
 runs, and example files are not changed. An existing tutorial is not resumed or
 overwritten by another invocation.
 
+Each exercise also uses its own `.mb-state/` plan registry. The guide and closing
+output print `export MB_STATE_DIR=/absolute/exercise/.mb-state` for manual
+continuation. Use that value when running the shown commands yourself, including
+from another directory. The parent shell's environment is not changed by the
+guided command. After manual work, unset MB_STATE_DIR (or restore your prior
+value) to return to your normal registry.
+
 ## Basic path: two Jobs, two collections
 
 The default exercise uses test_pass and test_pending from the existing sample.
@@ -82,7 +89,8 @@ cleanup or overwrite.
 
 Each exercise gets a `GUIDE.md` containing the full manual command sequence,
 expected results, directory meanings, and continuation instructions. After `q`,
-follow the displayed `cd` command and run the command shown at the paused step.
+follow the displayed `cd` and `export MB_STATE_DIR=...` commands, then run the
+command shown at the paused step.
 Do not restart earlier stages unnecessarily: prepare invalidates the saved plan,
 and run creates a new run. Collect/status can target a saved run with --run-dir.
 
@@ -95,6 +103,7 @@ The generated directories are:
 | Relative path in the exercise | Contents |
 | --- | --- |
 | `examples/` | Editable copies of the YAML and mock project scripts |
+| `.mb-state/plans/` | This exercise's isolated plan registration |
 | `work/sample-collector/.reg/` | MB context, plan and state |
 | `work/sample-collector/runs/<run-id>/` | MB execution/collection records, result.json and logs |
 | `work/sample-results/<run-id>/<job-id>/` | Project result.txt, sim.log, tarmac.log, mock wave.fsdb, collector call counts |

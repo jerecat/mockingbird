@@ -6,6 +6,7 @@ The existing example scripts remain the single source of tutorial behaviour.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import shlex
 import shutil
@@ -49,6 +50,7 @@ def _closing(root: Path, complete: bool) -> None:
     print(f"Directory: {root}")
     print("Manual commands below assume this directory:")
     print(f"  {shlex.join(['cd', str(root)])}")
+    print(f"  export MB_STATE_DIR={shlex.quote(str(root / '.mb-state'))}")
     print("Read GUIDE.md for the full sequence and how to continue.")
     print("MB context/plan: work/sample-collector/.reg/")
     print("MB records/logs: work/sample-collector/runs/<run-id>/")
@@ -58,6 +60,7 @@ def _closing(root: Path, complete: bool) -> None:
     print(f"  {shlex.join(['rm', '-rf', '--', str(root)])}")
     print("This removes the tutorial directory, including any edits you made inside it.")
     print("Nothing is deleted automatically.")
+    print("After manual work, unset MB_STATE_DIR (or restore its previous value).")
 
 
 def run_tutorial(directory: str | None = None, automatic: bool = False, advanced: bool = False) -> None:
@@ -96,12 +99,15 @@ def run_tutorial(directory: str | None = None, automatic: bool = False, advanced
             data["execution"]["jobs"] = ["test_pass", "test_pending"]
             definition.write_text(yaml.safe_dump(data, sort_keys=False))
         (root / "GUIDE.md").write_text(_guide(advanced))
+        env = dict(os.environ, MB_STATE_DIR=str(root / ".mb-state"))
         print(f"\nCreated: {root}")
         print(f"Commands run with cwd: {root}")
         print(f"Open examples/sample-collector.yaml to inspect the {count} Jobs.")
         print("plan: sample-collector keeps MB data under work/sample-collector/.")
         print("sources: [] uses existing scripts. Each run keeps its plan and records under runs/ there.")
         print("Each step below prints the ordinary command you can also run yourself.")
+        print("This exercise has its own plan registry so repeated tutorials stay independent.")
+        print(f"$ export MB_STATE_DIR={shlex.quote(env['MB_STATE_DIR'])}", flush=True)
 
         def step(title, explanation, args, expected=0, helper=False):
             print(f"\n--- {title} ---\n{explanation}")
@@ -114,7 +120,7 @@ def run_tutorial(directory: str | None = None, automatic: bool = False, advanced
             print(f"$ {shlex.join(shown)}", flush=True)
             if not _continue(automatic):
                 return False
-            with subprocess.Popen(command, cwd=root) as process:
+            with subprocess.Popen(command, cwd=root, env=env) as process:
                 try:
                     returncode = process.wait()
                 except KeyboardInterrupt:
@@ -207,6 +213,12 @@ def _guide(advanced: bool = False) -> str:
     return f"""# {mode} guided tutorial: manual continuation
 
 Run commands from this exercise directory with the installed `mb` command.
+First select this exercise's isolated plan registry (also printed by the guided command):
+
+```sh
+export MB_STATE_DIR="$PWD/.mb-state"
+```
+
 The examples create text artifacts, not real simulations. No external repository
 is cloned. The basic exercise has two Jobs; --advanced uses all eight sample Jobs.
 
@@ -285,4 +297,6 @@ For a smaller NEW run: `mb run sample-collector --test test_pass`.
 Keep the directory as a reference. When finished, move to its parent and remove
 ONLY this tutorial directory. The guided command prints the exact shell-quoted
 rm command. Nothing is deleted automatically; deletion also removes your edits.
+After cleanup, `unset MB_STATE_DIR` to return to your normal plan registry
+(or restore its previous value if you had selected another registry).
 """

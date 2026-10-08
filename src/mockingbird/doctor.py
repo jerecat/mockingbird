@@ -56,7 +56,8 @@ def run_doctor(defn: dict[str, Any]) -> list[CheckResult]:
         except Exception as exc:
             checks.append(CheckResult(component, "plugin", "FAIL", f"{type(exc).__name__}: {exc}"))
             continue
-        checks.extend(_safe(component, "probe", lambda p=provider, s=source: p.probe(s)))
+        source_context = dict(source, _invocation_dir=context["invocation_dir"])
+        checks.extend(_safe(component, "probe", lambda p=provider, s=source_context: p.probe(s)))
 
     try:
         adapter = load_adapter(str(context["execution"]["adapter"]))

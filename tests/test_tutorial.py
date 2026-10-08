@@ -109,3 +109,19 @@ def test_installed_without_examples_has_actionable_error(monkeypatch):
     monkeypatch.setattr(tutorial, "__file__", "/not-a-clone/lib/mockingbird/tutorial.py")
     with pytest.raises(ValueError, match="clone.*install"):
         tutorial._examples()
+
+
+def test_repeated_tutorials_do_not_replace_normal_plan_registration(tmp_path):
+    from mockingbird import registry
+    normal = tmp_path / "normal"; normal.mkdir()
+    with registry.registration({'plan': 'sample-collector', '_invocation_dir': str(normal),
+                                '_definition_path': str(normal / 'sample.yaml')}):
+        pass
+    entry = registry.entry_path('sample-collector').read_bytes()
+    for name in ['first', 'second']:
+        target = tmp_path / name
+        result = cli(tmp_path, '--directory', target, '--yes')
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert 'export MB_STATE_DIR=' in result.stdout
+        assert (target / '.mb-state/plans/sample-collector.json').is_file()
+        assert registry.entry_path('sample-collector').read_bytes() == entry

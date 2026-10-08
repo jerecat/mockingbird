@@ -21,7 +21,8 @@ scheduler:
 
 ## User operations
 
-Run these commands from the same project directory:
+Start prepare from the project directory. It registers the plan's name and
+original working directory. Named commands then work from any directory:
 
 ```sh
 mb prepare regression.yaml
@@ -54,7 +55,7 @@ underscores or hyphens, starting with a letter or digit. Source `name` and Job
 `id` keep their existing meanings.
 
 A YAML filename is provenance, not identity. Two YAMLs with `plan: smoke` confirm
-the same named plan when used from the same project directory. The last
+the same named plan in the user's registry, even from different directories. The last
 successful confirmation supplies the next run. Editing, renaming or deleting
 YAML after confirmation does not change execution or prevent result inspection.
 Run does not reread YAML, compare edits, or offer to confirm implicitly.
@@ -73,22 +74,77 @@ before confirmation. Execution and scheduler edits need only plan.
 
 ## MB chooses the storage paths
 
-| Data | Location relative to the invocation directory |
+| Data | Location relative to the first prepare's project directory |
 | --- | --- |
 | All data for smoke | `work/smoke/` |
 | Acquired sources | `work/smoke/sources/<source-name>/` |
 | Preparation records and current plan | `work/smoke/.reg/` |
 | Each execution and its results | `work/smoke/runs/<run-id>/` |
 
-There are no YAML workspace or run-root settings. A different invocation
-directory has independent storage, even for the same plan name. MB does not
-search other directories for plans. Moving a prepared environment requires
-explicit preparation at the new location; saved paths are not silently rebased.
+There are no YAML workspace or run-root settings. The first prepare registers
+the name in `~/.local/state/mockingbird/plans/<plan>.json`, recording the absolute
+project directory and original YAML path. Each name identifies one plan for this
+user. Later prepare/plan/all with the same name use the original project, even
+when the input YAML or the calling terminal is elsewhere. A new plan needs a
+different name. MB looks up the registration; it does not search parent or nearby
+directories or silently switch to a local copy.
+
+`MB_STATE_DIR` can override the state directory; it must be absolute. Ordinary
+use needs no environment setting. Tests and guided tutorials use isolated state
+directories so their names cannot affect normal projects. This is single-user
+plan management, not a shared-user registry or a results database.
+
+For example, after preparing and confirming smoke under `/project`:
+
+```sh
+cd /tmp
+mb run smoke
+mb status smoke
+mb collect smoke
+mb status smoke --history
+```
+
+All four operations still use `/project/work/smoke/`. CLI arguments naming files
+(YAML, --selection, --failed-from and --run-dir) are resolved from the caller's
+directory as usual; use absolute paths when needed. They do not relocate plans.
+
+An unknown name is an error, including `status --history`. A registered plan
+with no runs reports `No runs yet.` for history. A missing registered location
+reports its actual path instead of claiming that the plan has never run.
 
 Commands and collectors use the invocation directory recorded at preparation
 and included in the confirmed plan as cwd. The script's location does not imply
 `cd`. Project scripts own their output paths; acquired sources and run logs do
 not change the command cwd. Wrappers can change directory explicitly.
+
+## Existing plans and cleanup
+
+For a plan prepared before name registration was introduced, run
+`mb plan /path/to/definition.yaml` once **from the original project directory**.
+This registers the existing location and confirms the supplied YAML; it does
+not repeat source acquisition or setup, move files, or alter older runs. It
+requires the existing preparation to be usable. After that, use its name from
+any directory. An explicit `--run-dir` still works without registration.
+
+If two older project directories already contain the same plan name, registration
+does not merge them. Prepare/plan/all from the conflicting local environment
+report both locations. Continue with the registered project or use a new plan
+name for the other project. Historical runs can still be read with --run-dir.
+
+If files disappear, restore the registered location or explicitly prepare it
+again. Prepare can recreate a removed `work/<plan>/` under the original project;
+it does not recover deleted runs. If the project directory itself has gone, MB
+reports the missing path and the registration file instead of choosing a new
+location. To deliberately forget a name, stop active MB operations for it and
+remove only its registration file, for example:
+
+```sh
+rm -- ~/.local/state/mockingbird/plans/smoke.json
+```
+
+Use the equivalent path under MB_STATE_DIR if overridden. This does not delete
+the plan's source trees or run records. A subsequent explicit prepare can assign
+the name to a new location. Existing absolute artifact paths are never rebased.
 
 ## Inspect results and the exact plan used
 
@@ -110,7 +166,18 @@ argv, collector contracts, selection, cwd and preparation evidence.
 Without a run selector, status and collect use the latest-started run. Finishing
 an older run or collecting an older result does not change that choice. For
 explicit directories, including legacy records, `--run-dir PATH` remains
-available. A run from another plan is rejected.
+available. It can also inspect another operator's compatible records without
+registering or replacing that plan locally; the supplied name must match the
+name in the saved run. A run with a different plan name is rejected.
+
+Each collect replaces that run's result.json with the latest aggregate result.
+Final Job verdicts stay fixed; unresolved Jobs can be collected again. Even a
+collect of an already-final run regenerates the aggregate's generated_at. Use
+started_at, not collection time, to order runs. The history command reads run.json
+and result.json under this plan's runs directory, newest-started first; it does
+not scan other operators' directories. Other result sets can be used by a
+separate history consumer without changing plan registration. Historical plan
+details remain in each run's adjacent plan.json, not embedded in result.json.
 
 FAIL selection still requires an explicit previous result:
 

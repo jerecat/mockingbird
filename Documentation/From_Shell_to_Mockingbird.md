@@ -195,9 +195,11 @@ mb collect worktree-demo --run-dir work/worktree-demo/runs/<run-id>
 All relative configuration paths in this example assume invocation from `lab`.
 The built-in command adapter runs commands and collectors with the **invocation
 directory saved at prepare time** as cwd. The definition file's directory and
-the script's directory do not implicitly become cwd. Keep using the same
-invocation directory for this workflow; relative workspace lookup on subsequent
-CLI invocations also depends on where you invoke MB.
+the script's directory do not implicitly become cwd. The first prepare registers
+this project directory against the plan name. Later named commands can run from
+any directory and still use this saved cwd and storage. YAML/selection/run-directory
+arguments remain ordinary caller-relative paths. For another project, use a
+different plan name. See [Named plans](Named_Plans.md) for registration and migration.
 
 | Path under `lab` | Owner and purpose |
 | --- | --- |

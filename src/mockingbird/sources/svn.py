@@ -30,7 +30,7 @@ class Provider(SourceProvider):
             revision = str(source.get("revision", "HEAD"))
             _run([
                 "svn", "info", "--non-interactive", "-r", revision, str(source["url"])
-            ])
+            ], cwd=source.get("_invocation_dir"))
         except Exception as exc:
             return [
                 CheckResult(component, "svn", "PASS", version if 'version' in locals() else "svn found"),
@@ -50,7 +50,8 @@ class Provider(SourceProvider):
         if not reused:
             if destination.exists() and any(destination.iterdir()):
                 raise RuntimeError(f"source destination is not empty: {destination}")
-            _run(["svn", "checkout", "-r", revision, url, str(destination)])
+            _run(["svn", "checkout", "-r", revision, url, str(destination)],
+                 cwd=source.get("_invocation_dir"))
 
         resolved = _run(["svn", "info", "--show-item", "revision", str(destination)])
         return {

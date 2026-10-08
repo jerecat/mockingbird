@@ -48,6 +48,9 @@ class Provider(SourceProvider):
 
     def materialize(self, source, destination):
         manifest = _manifest(source)
+        url = str(source["url"])
+        if source.get("_invocation_dir") and ":" not in url and not Path(url).is_absolute():
+            url = str((Path(source["_invocation_dir"]) / url).resolve())
         reused = (destination / ".repo").is_dir()
         if not reused:
             if destination.exists() and any(destination.iterdir()):
@@ -61,7 +64,7 @@ class Provider(SourceProvider):
                                              dir=destination.parent) as staging:
                 checkout = Path(staging) / "checkout"
                 checkout.mkdir()
-                _run(["repo", "init", "-u", str(source["url"]),
+                _run(["repo", "init", "-u", url,
                       "-b", str(source.get("revision", "HEAD")), "-m", manifest],
                      cwd=checkout, stream=True)
                 _run(["repo", "sync", "-j", "1"], cwd=checkout, stream=True)

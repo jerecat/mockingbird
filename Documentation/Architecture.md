@@ -199,6 +199,11 @@ probe(source) -> list[CheckResult]
 materialize(source, destination) -> resolved_evidence
 ```
 
+Core supplies the saved project directory as `source['_invocation_dir']` to
+probe/materialize. Providers can resolve relative source inputs against it without
+changing the MB process cwd. It is runtime context, not a required YAML field.
+Built-in providers preserve this base when prepare/doctor is called elsewhere.
+
 Git and SVN are bundled implementations. Any number and mixture of sources is
 allowed in one regression context.
 

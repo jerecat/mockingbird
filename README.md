@@ -52,6 +52,22 @@ saved plan. Each run retains the exact plan it used and its results, even if the
 YAML is later edited or deleted. Optional `mb setup smoke` runs saved preparation
 commands between prepare and plan.
 
+Plan names are unique in your user registry. The first prepare records the
+project directory; named commands work from any directory afterwards:
+
+```sh
+cd /tmp
+mb status smoke             # Latest-started run, even if it is not collected yet
+mb collect smoke            # Collect that same run using its saved plan and cwd
+```
+
+Storage remains under the original project's `work/<plan>/`. Registrations live
+in `~/.local/state/mockingbird/plans/`; `MB_STATE_DIR` can select a different
+absolute state directory. Existing 0.6 local plans can be registered by running
+`mb plan <definition.yaml>` once from their original project directory, without
+repeating prepare or changing their run history. See the named-plan guide for
+missing locations, name conflicts, and optional cleanup.
+
 Read [Named plans and execution history](Documentation/Named_Plans.md) for the
 complete workflow and migration from 0.5. Core owns lifecycle and record keeping;
 project commands and plugins own tool, source, capacity and result semantics.
@@ -169,7 +185,7 @@ CLI registration tests that import Python 3.11's `tomllib`. Without the
 are needed, including for the lifecycle side-effect tests.
 
 Verified on Linux with Python 3.10.19, PyYAML 5.4.1 and pytest 9.0.3:
-307 tests passed (the two CLI registration tests excluded). This records the
+321 tests passed (the two CLI registration tests excluded). This records the
 suite at verification time; the count will grow as tests are added. Python
 versions below 3.10 have not been verified.
 

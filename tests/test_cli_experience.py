@@ -29,7 +29,7 @@ def test_first_run_recovery_and_human_outputs(session):
     definition, cli = session
     missing = cli("run", "test")
     assert missing.returncode == 1 and "Traceback" not in missing.stderr
-    assert "context not prepared" in missing.stderr
+    assert "not registered" in missing.stderr
     assert cli("prepare", definition).returncode == 0
     missing = cli("run", "test")
     commands = [shlex.split(line.strip())[1:] for line in missing.stderr.splitlines() if line.startswith("  mb ")]

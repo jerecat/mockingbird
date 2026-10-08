@@ -73,6 +73,11 @@ executions.json, collection.json, result.json and per-Job logs/checkpoints.
 The plan contains the full saved context. Original YAML is not required for
 inspection or collection.
 
+These named commands work from any directory after prepare registers the plan.
+The paths above remain relative to the original project directory. Without
+--run, status shows the latest-started run; an uncollected latest run is shown as
+uncollected instead of falling back to an older result.
+
 ## 6. Exercise lifecycle manually
 
 ```bash

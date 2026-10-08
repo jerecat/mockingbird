@@ -21,6 +21,7 @@ from .plugins import load_adapter, load_capacity_provider
 from .scheduler import run_jobs, validate_max_parallel
 from .selection import Selection, select_jobs
 from .validation import FINAL_STATUSES, bind_execution, positive_seconds, validate_jobs, validate_outcome
+from . import registry
 
 
 _CANONICAL_STATUSES = FINAL_STATUSES
@@ -137,8 +138,12 @@ def _setup(defn, *, on_progress=None):
 
 
 def create_plan(defn: dict[str, Any]) -> dict[str, Any]:
-    with prepared_environment(defn):
-        return _create_plan(defn)
+    # A legacy prepared plan can be registered by explicit confirmation, without
+    # repeating acquisition/setup. Do not register an unprepared definition here.
+    load_context(registry.definition_target(defn))
+    with registry.registration(defn) as target:
+        with prepared_environment(target):
+            return _create_plan(target)
 
 
 def _create_plan(defn):

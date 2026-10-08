@@ -19,6 +19,7 @@ from .status import snapshot, history, plan_details
 from .io import read_json
 from .models import Job
 from .setup_contract import setup_required
+from . import registry
 
 
 def _add_selection_args(parser: argparse.ArgumentParser) -> None:
@@ -94,7 +95,8 @@ def _summary(result: dict) -> str:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mb", description="Run Jobs in list order and collect their results.",
-        epilog="First run: prepare -> setup (if configured) -> plan -> run -> collect (or use all).")
+        epilog="First run: prepare -> setup (if configured) -> plan -> run -> collect (or use all). "
+               "Prepare registers the plan; named commands work from any directory.")
     parser.add_argument("--debug", action="store_true", help="show a traceback on errors")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -103,7 +105,7 @@ def build_parser() -> argparse.ArgumentParser:
         "prepare": "prepare sources and save the workspace context",
         "setup": "set up the prepared execution environment",
         "collect": "collect unresolved results from an existing run",
-        "status": "show saved execution and collection observations",
+        "status": "show saved observations for the latest-started run, or a selected run",
         "all": "prepare, setup, plan, run, then collect",
     }
     for name, description in descriptions.items():
@@ -167,10 +169,12 @@ def _next(command, definition, run_dir=None):
 
 
 def _definition_for(defn):
+    defn = registry.definition_target(defn)
     path = metadata_path(defn) / "context.json"
     if path.is_file():
         return read_json(path).get("definition_path", "<definition.yaml>")
-    return "<definition.yaml>"
+    entry = registry.lookup(defn['plan'])
+    return entry['definition_path'] if entry else "<definition.yaml>"
 
 
 def _history(defn, as_json=False):
@@ -331,7 +335,13 @@ def _dispatch(args, parser) -> None:
         run_tutorial(args.directory, args.yes, args.advanced)
         return
     named = args.command in {"setup", "run", "dry-run", "collect", "status"}
-    defn = plan_target(args.definition) if named else load_definition(args.definition)
+    if named:
+        # Explicit run paths can refer to another operator's or legacy evidence;
+        # inspecting them must neither require nor change our name registration.
+        defn = (plan_target(args.definition, Path.cwd()) if getattr(args, "run_dir", None)
+                else plan_target(args.definition))
+    else:
+        defn = load_definition(args.definition)
     args.plan_name = defn.get("plan")
     if getattr(args, "run", None):
         run_id = args.run
@@ -431,6 +441,7 @@ def _dispatch(args, parser) -> None:
     if args.command == "all":
         print("Preparing workspace...", flush=True)
         context = prepare(defn)
+        defn = dict(defn, _invocation_dir=context["invocation_dir"])
         if setup_required(context):
             print("Setting up execution environment...", flush=True)
             lifecycle.setup(defn, on_progress=_setup_progress)

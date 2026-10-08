@@ -74,6 +74,9 @@ remain outside core.
 
 ## AC-9: Intent and machine evidence are separate
 
+Plan names resolve through the single-user registry independently of caller cwd
+(ADR 0015). Registration records a location; it does not contain run results.
+
 ```text
 regression.yaml   human intent
 context.json      resolved/frozen context
