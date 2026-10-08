@@ -68,6 +68,21 @@ class Provider(SourceProvider):
             CheckResult(component, "repository", "PASS", "repository reachable without interactive prompt"),
         ]
 
+    def observe(self, source):
+        observation = {"prepared_commit": source.get("resolved_revision"),
+                       "current_commit": None, "dirty": None}
+        destination = Path(source["path"])
+        def inspect(*args):
+            return subprocess.run(["git", *args], cwd=destination, check=True,
+                                  text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                  timeout=10).stdout.strip()
+        try:
+            observation["current_commit"] = inspect("rev-parse", "HEAD")
+            observation["dirty"] = bool(inspect("status", "--porcelain", "--untracked-files=normal"))
+        except Exception as exc:
+            observation["error"] = f"{type(exc).__name__}: {exc}"
+        return observation
+
     def materialize(self, source: dict[str, Any], destination: Path) -> dict[str, Any]:
         url = str(source["url"])
         revision = str(source.get("revision", "HEAD"))

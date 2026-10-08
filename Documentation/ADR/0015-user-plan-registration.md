@@ -1,6 +1,6 @@
 # ADR 0015: Resolve plan names independently of the caller's directory
 
-Status: accepted, 2026-10-08
+Status: accepted, 2026-10-08. YAML confirmation and registration recovery amended by ADR 0016.
 
 ## Context
 

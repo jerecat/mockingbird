@@ -14,7 +14,7 @@ Do not use `mb all` for this exercise: it would wait at the same capacity gate.
 
 ```sh
 mb prepare examples/capacity-gate.yaml
-mb plan examples/capacity-gate.yaml
+mb plan capacity-gate
 mb run capacity-gate
 ```
 

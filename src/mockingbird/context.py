@@ -254,6 +254,9 @@ def _prepare(defn: dict[str, Any]) -> dict[str, Any]:
     context["preparation_contract"] = preparation_contract(provisional_context(defn))
     write_json(metadata / "context.json", context)
     write_json(metadata / "state.json", {"prepared_at": context["prepared_at"]})
+    entry = registry.lookup(defn["plan"])
+    entry["definition_path"] = defn["_definition_path"]
+    write_json(registry.entry_path(defn["plan"]), entry)
     (metadata / "preparing.json").unlink()
     return context
 

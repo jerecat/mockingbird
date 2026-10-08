@@ -344,7 +344,7 @@ def test_selection_export_error_reports_successful_confirmation(tmp_path, monkey
     path.write_text(json.dumps({k: v for k, v in d.items() if not k.startswith('_')}))
     prepare(d)
     directory = tmp_path / 'directory'; directory.mkdir()
-    monkeypatch.setattr(sys, 'argv', ['mb', 'plan', str(path), '--write-selection', str(directory)])
+    monkeypatch.setattr(sys, 'argv', ['mb', 'plan', 'A', '--write-selection', str(directory)])
     with pytest.raises(SystemExit) as error:
         cli.main()
     assert error.value.code == 1

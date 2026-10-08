@@ -113,7 +113,7 @@ def build_parser() -> argparse.ArgumentParser:
         cmd.add_argument("definition", metavar="PLAN" if name in {"setup", "collect", "status"} else "YAML")
 
     plan = sub.add_parser("plan", help="validate and save the Job list")
-    plan.add_argument("definition", metavar="YAML")
+    plan.add_argument("definition", metavar="PLAN")
     plan.add_argument("--write-selection", metavar="PATH")
 
     dry = sub.add_parser("dry-run", help="preview the planned selection without executing")
@@ -268,6 +268,17 @@ def _progress(event, execution):
 
 
 
+def _source_summary(observations):
+    for name, item in observations.items():
+        print(f"Source: {name}")
+        print(f"  Prepared: {item.get('prepared_commit') or 'unknown'}")
+        dirty = item.get("dirty")
+        state = "unknown" if dirty is None else "dirty" if dirty else "clean"
+        print(f"  Current:  {item.get('current_commit') or 'unknown'} ({state})")
+        if item.get("error"):
+            print(f"  Observation: {item['error']}")
+
+
 def _setup_progress(index, total, job_id, state):
     print(f"Setup [{index}/{total}] {job_id}: {state}", flush=True)
 
@@ -334,7 +345,7 @@ def _dispatch(args, parser) -> None:
         from .tutorial import run_tutorial
         run_tutorial(args.directory, args.yes, args.advanced)
         return
-    named = args.command in {"setup", "run", "dry-run", "collect", "status"}
+    named = args.command in {"setup", "plan", "run", "dry-run", "collect", "status"}
     if named:
         # Explicit run paths can refer to another operator's or legacy evidence;
         # inspecting them must neither require nor change our name registration.
@@ -343,6 +354,12 @@ def _dispatch(args, parser) -> None:
     else:
         defn = load_definition(args.definition)
     args.plan_name = defn.get("plan")
+    if args.command == "plan":
+        definition_path = _definition_for(defn)
+        loaded = load_definition(definition_path)
+        if loaded.get("plan") != args.plan_name:
+            raise ValueError(f"registered YAML {definition_path} must contain plan: {args.plan_name}")
+        defn = dict(loaded, _invocation_dir=defn["_invocation_dir"])
     if getattr(args, "run", None):
         run_id = args.run
         if Path(run_id).name != run_id or run_id in {".", ".."} or "\\" in run_id:
@@ -369,7 +386,7 @@ def _dispatch(args, parser) -> None:
             print(f"Sources: {len(context['sources'])}")
             for source in context['sources']:
                 print(f"  {source['name']}: {source.get('materialization', 'prepared')}")
-            _next("setup" if setup_required(context) else "plan", defn["plan"] if setup_required(context) else args.definition)
+            _next("setup" if setup_required(context) else "plan", defn["plan"])
         return
 
     if args.command == "setup":
@@ -379,7 +396,7 @@ def _dispatch(args, parser) -> None:
             print(f"Setup complete. Records: {attempt}")
         else:
             print("Setup not required: no setup commands configured.")
-        _next("plan", _definition_for(defn))
+        _next("plan", defn["plan"])
         return
 
     if args.command == "plan":
@@ -403,7 +420,7 @@ def _dispatch(args, parser) -> None:
 
     if args.command == "run":
         selection = _selection(args)
-        outcome = lifecycle.run(defn, selection, on_progress=_progress,
+        outcome = lifecycle.run(defn, selection, on_progress=_progress, on_sources=_source_summary,
                                 confirm=_confirm_run if args.interactive else None)
         if outcome is None:
             print("run: cancelled; no Jobs started")
@@ -448,7 +465,7 @@ def _dispatch(args, parser) -> None:
         print("Validating plan...", flush=True)
         lifecycle.create_plan(defn)
         selection = _selection(args)
-        outcome = lifecycle.run(defn, selection, on_progress=_progress,
+        outcome = lifecycle.run(defn, selection, on_progress=_progress, on_sources=_source_summary,
                                 confirm=_confirm_run if args.interactive else None)
         if outcome is None:
             print("run: cancelled; no Jobs started")
@@ -502,8 +519,8 @@ def main() -> None:
             for step in exc.steps:
                 if step == args.command:
                     break
-                target = (getattr(args, "plan_name", None) or args.definition) if step in {"setup", "run"} else (
-                    args.definition if args.command in {"prepare", "plan", "all", "doctor"} else
+                target = (getattr(args, "plan_name", None) or args.definition) if step in {"setup", "plan", "run"} else (
+                    args.definition if args.command in {"prepare", "all", "doctor"} else
                     _definition_for(plan_target(args.definition)))
                 print(f"  {_command(step, target)}", file=sys.stderr)
             print("Then retry your command.", file=sys.stderr)

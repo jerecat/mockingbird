@@ -24,7 +24,7 @@ Run from the repository root with the installed virtual environment active:
 ```bash
 mb prepare examples/sample-collector.yaml
 mb setup sample-collector
-mb plan examples/sample-collector.yaml
+mb plan sample-collector
 mb run sample-collector
 mb collect sample-collector
 mb status sample-collector

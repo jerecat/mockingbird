@@ -41,7 +41,7 @@ def test_named_workflow_after_cd_and_replan_preserves_run_history(operator):
     project, caller, definition, data, cli = operator
     cli(project, "prepare", definition)
     entry = registry.entry_path("smoke").read_bytes()
-    cli(caller, "plan", definition)
+    cli(caller, "plan", "smoke")
     cli(caller, "setup", "smoke")
     cli(caller, "dry-run", "smoke")
     cli(caller, "run", "smoke")
@@ -59,7 +59,8 @@ def test_named_workflow_after_cd_and_replan_preserves_run_history(operator):
     data["execution"]["jobs"] = ["first", "added"]
     edited = caller / "renamed.yaml"
     edited.write_text(json.dumps(data))
-    cli(caller, "plan", edited)
+    cli(caller, "prepare", edited)
+    cli(caller, "plan", "smoke")
     cli(caller, "run", "smoke")
     r2 = json.loads(cli(project / "work/smoke", "status", "smoke", "--json").stdout)
     assert r2["run_id"] != r1["run_id"] and r2["total"] == 2
@@ -76,7 +77,7 @@ def test_named_workflow_after_cd_and_replan_preserves_run_history(operator):
     assert [row["run_id"] for row in rows] == [r2["run_id"], r1["run_id"]]
     assert rows[0]["result"] is None and rows[1]["result"] == "PASS"
     cli(caller, "collect", "smoke")
-    assert registry.entry_path("smoke").read_bytes() == entry
+    assert registry.lookup("smoke")["definition_path"] == str(edited)
     assert not (caller / "work").exists()
     assert not (project / "work/smoke/work").exists()
 
@@ -127,7 +128,7 @@ def test_setup_capacity_and_collect_commands_use_saved_cwd(operator):
     definition.write_text(json.dumps(data))
     cli(project, "prepare", definition)
     cli(caller, "setup", "smoke")
-    cli(caller, "plan", definition)
+    cli(caller, "plan", "smoke")
     cli(caller, "run", "smoke")
     cli(caller, "collect", "smoke")
     assert all((project / n).is_file() for n in ["setup-done", "capacity-used", "collect-used"])
@@ -143,8 +144,9 @@ def test_legacy_confirmation_registers_without_repeating_prepare(operator):
     missing = cli(caller, "status", "smoke", "--history", expected=1)
     assert "not registered" in missing.stderr and "original project directory" in missing.stderr
     assert "No runs yet" not in missing.stdout
-    cli(project, "plan", definition)
-    assert context.read_bytes() == original_context
+    cli(project, "prepare", definition)
+    cli(project, "plan", "smoke")
+    assert context.read_bytes() != original_context
     assert json.loads(cli(caller, "status", "smoke", "--json").stdout)["final"] == 1
 
 
@@ -174,7 +176,7 @@ def test_two_legacy_locations_with_same_name_are_not_silently_merged(operator):
     cli(project, "all", definition)
     shutil.copytree(project / "work", caller / "work")
     before = (project / "work/smoke/.reg/context.json").read_bytes()
-    for command in ["prepare", "plan", "all"]:
+    for command in ["prepare", "all"]:
         response = cli(caller, command, definition, expected=1)
         assert "another local environment" in response.stderr
     assert (project / "work/smoke/.reg/context.json").read_bytes() == before
@@ -251,3 +253,77 @@ def test_first_prepare_name_reservation_prevents_two_locations(tmp_path):
             with pytest.raises(RuntimeError, match="registration is busy"):
                 pool.submit(conflicting).result(timeout=5)
     assert registry.lookup("smoke")["directory"] == str(first)
+
+
+def test_plan_path_lifecycle_and_failed_confirmation(operator):
+    project, caller, old, data, cli = operator
+    (project / 'plan').mkdir()
+    path = project / 'plan/xxx.yml'
+    old.rename(path)
+    cli(project, 'prepare', 'plan/xxx.yml')
+    cli(caller, 'setup', 'smoke')
+    cli(caller, 'plan', 'smoke')
+    saved = project / 'work/smoke/.reg/plan.json'
+    before = saved.read_bytes()
+    cli(project, 'plan', 'plan/xxx.yml', expected=1)
+    data['plan'] = 'wrong'
+    path.write_text(json.dumps(data))
+    assert 'must contain plan: smoke' in cli(caller, 'plan', 'smoke', expected=1).stderr
+    assert saved.read_bytes() == before
+    path.unlink()
+    cli(caller, 'plan', 'smoke', expected=1)
+    assert saved.read_bytes() == before
+    cli(caller, 'run', 'smoke')
+    cli(caller, 'collect', 'smoke')
+
+
+def test_git_run_observations_and_reprepare(operator):
+    project, caller, definition, data, cli = operator
+    origin = project / 'origin'; origin.mkdir()
+    def git(root, *args):
+        return subprocess.run(['git', '-C', str(root), *args], check=True,
+                              capture_output=True, text=True).stdout.strip()
+    git(origin, 'init')
+    git(origin, 'config', 'user.email', 'test@example.invalid')
+    git(origin, 'config', 'user.name', 'Test')
+    (origin / 'tracked').write_text('original')
+    (origin / '.gitignore').write_text('ignored\n')
+    git(origin, 'add', '.')
+    git(origin, 'commit', '-m', 'initial')
+    first = git(origin, 'rev-parse', 'HEAD')
+    data['sources'] = [{'name': 'dut', 'provider': 'git', 'url': str(origin)}]
+    definition.write_text(json.dumps(data))
+    cli(project, 'prepare', definition)
+    tree = project / 'work/smoke/sources/dut'
+    cli(caller, 'plan', 'smoke')
+    records = []
+    def run():
+        output = cli(caller, 'run', 'smoke').stdout
+        status = json.loads(cli(caller, 'status', 'smoke', '--json').stdout)
+        path = Path(status['run_dir']) / 'run.json'
+        records.append((path, path.read_bytes()))
+        obs = json.loads(path.read_text())['source_observations']['dut']
+        assert 'Source: dut' in output
+        return obs
+    (tree / 'ignored').touch()
+    assert run() == dict(prepared_commit=first, current_commit=first, dirty=False)
+    (tree / 'untracked').touch()
+    assert run()['dirty'] is True
+    (tree / 'untracked').unlink()
+    (tree / 'tracked').write_text('edited')
+    assert run()['dirty'] is True
+    cli(caller, 'prepare', definition)
+    cli(caller, 'plan', 'smoke')
+    assert run() == dict(prepared_commit=first, current_commit=first, dirty=True)
+    git(tree, 'add', 'tracked')
+    assert run()['dirty'] is True
+    git(tree, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'edit')
+    second = git(tree, 'rev-parse', 'HEAD')
+    assert run() == dict(prepared_commit=first, current_commit=second, dirty=False)
+    cli(caller, 'prepare', definition)
+    cli(caller, 'plan', 'smoke')
+    assert run() == dict(prepared_commit=second, current_commit=second, dirty=False)
+    shutil.rmtree(tree)
+    failed_observation = run()
+    assert failed_observation['dirty'] is None and 'error' in failed_observation
+    assert all(path.read_bytes() == contents for path, contents in records)

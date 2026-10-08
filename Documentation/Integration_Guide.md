@@ -119,7 +119,7 @@ The normal asynchronous sequence is:
     mb doctor regression.yaml
     mb prepare regression.yaml
     mb setup soc-nightly
-    mb plan regression.yaml
+    mb plan soc-nightly
     mb dry-run soc-nightly
     mb run soc-nightly
 

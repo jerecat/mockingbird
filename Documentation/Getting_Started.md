@@ -83,7 +83,7 @@ uncollected instead of falling back to an older result.
 ```bash
 mockingbird doctor examples/sanity-linux.yaml
 mockingbird prepare examples/sanity-linux.yaml
-mockingbird plan examples/sanity-linux.yaml
+mockingbird plan sanity-linux
 mockingbird dry-run linux-sanity
 mockingbird run linux-sanity --interactive
 mockingbird collect linux-sanity

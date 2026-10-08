@@ -17,7 +17,7 @@ def test_mock_simv_user_journey(tmp_path):
 
     def cli(cycle, *args, expected=0):
         proc = subprocess.run([sys.executable, "-m", "mockingbird.cli", cycle,
-                               ("examples/sample-collector.yaml" if cycle in {"prepare", "plan", "doctor", "all"} else "sample-collector"), *args],
+                               ("examples/sample-collector.yaml" if cycle in {"prepare", "doctor", "all"} else "sample-collector"), *args],
                               cwd=tmp_path, env=env, capture_output=True, text=True, timeout=20)
         assert proc.returncode == expected, proc.stdout + proc.stderr
 

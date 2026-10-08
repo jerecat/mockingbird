@@ -81,7 +81,7 @@ Run each lifecycle step:
 
 ```sh
 mb prepare regression.yaml
-mb plan regression.yaml
+mb plan worktree-demo
 mb dry-run worktree-demo
 mb run worktree-demo
 mb status worktree-demo
@@ -252,7 +252,7 @@ For capacity and asynchronous submission, use [Integration Guide](Integration_Gu
 For a prepared standard command setup, edit the execution settings, then confirm:
 
 ```sh
-mb plan regression.yaml
+mb plan worktree-demo
 mb run worktree-demo
 mb collect worktree-demo
 mb status worktree-demo --history
@@ -260,8 +260,8 @@ mb status worktree-demo --history
 
 Editing YAML alone does not alter the confirmed plan. Run uses the last successful
 confirmation and does not ask whether to update it. A failed confirmation keeps
-the prior plan intact. Changing the YAML filename or using another file with the
-same plan name is allowed. Each run keeps its own confirmed contents and results.
+the prior plan intact. To move the YAML or use another file with the same plan name, explicitly
+prepare that path again before setup (if needed) and plan. Each run keeps its own confirmed contents and results.
 Use `mb status worktree-demo --run <run-id> --plan` to inspect those contents.
 
 Changes to sources, setup or adapter preparation requirements need prepare, then

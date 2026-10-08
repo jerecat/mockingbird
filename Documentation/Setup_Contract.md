@@ -55,7 +55,7 @@ list. Their hooks should raise on failure and remain synchronous.
 ```sh
 mb prepare regression.yaml
 mb setup smoke
-mb plan regression.yaml
+mb plan smoke
 mb run smoke
 mb collect smoke
 ```
@@ -132,7 +132,7 @@ Remove only the sample failure marker, then retry:
 ```sh
 rm work/setup-demo/force-setup-failure
 mb setup setup-demo
-mb plan examples/setup-commands.yaml
+mb plan setup-demo
 mb run setup-demo
 mb collect setup-demo
 ```

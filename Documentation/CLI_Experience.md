@@ -15,7 +15,7 @@ collector faults; a completed tutorial still exits zero.
 
 ```sh
 mb prepare examples/sample-collector.yaml
-mb plan examples/sample-collector.yaml
+mb plan sample-collector
 mb dry-run sample-collector
 mb run sample-collector
 mb status sample-collector
@@ -31,7 +31,7 @@ For example, running before preparation reports on stderr:
 ```text
 Error: plan 'sample-collector' is not registered.
 For a new plan, run mb prepare <definition.yaml> from its project directory.
-For an existing local plan, run mb plan <definition.yaml> once from its original project directory.
+To restore a registration, run mb prepare <definition.yaml> from its original project directory.
 ```
 
 Before the first prepare, supply your YAML path in place of `<definition.yaml>`.
@@ -121,7 +121,7 @@ With no setup list, the standard command adapter permits prepare directly follow
 
 ## Edit execution and replan
 
-Confirm execution/scheduler edits with `mb plan YAML`. Setup/run/dry-run/status/
+Confirm execution/scheduler edits with `mb plan PLAN`. Setup/run/dry-run/status/
 collect take the plan name. Run does not reread YAML or offer to update it.
 Failed confirmation leaves the previous plan intact. Sources/setup changes still
 require explicit preparation; see [Named plans](Named_Plans.md).

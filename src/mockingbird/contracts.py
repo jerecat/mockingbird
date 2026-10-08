@@ -90,6 +90,10 @@ class SourceProvider(ABC):
             )
         ]
 
+    def observe(self, source: dict[str, Any]) -> dict[str, Any] | None:
+        """Optional read-only run-start evidence; None means unsupported."""
+        return None
+
     @abstractmethod
     def materialize(
         self, source: dict[str, Any], destination: Path

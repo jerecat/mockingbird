@@ -137,7 +137,7 @@ def run_tutorial(directory: str | None = None, automatic: bool = False, advanced
         stages = [
             ("1. Check connections", "Doctor checks configuration, executable availability and capacity without starting Jobs.\nThe summary groups these checks; use doctor --details if you need individual diagnostics.", ["doctor", DEFINITION]),
             ("2. Prepare", "Save context in work/sample-collector/.reg/. No source clone is needed.", ["prepare", DEFINITION]),
-            ("3. Plan", f"Resolve defaults and validate {count} complete Job contracts; nothing executes yet.", ["plan", DEFINITION]),
+            ("3. Plan", f"Resolve defaults and validate {count} complete Job contracts; nothing executes yet.", ["plan", "sample-collector"]),
             ("4. Preview a selection", f"Preview test_pass and test_pending without executing them. The next run uses all {count} Jobs.",
              ["dry-run", "sample-collector", "--test", "test_pass", "--test", "test_pending"]),
             ("5. Run", f"Execute {count} commands serially. test_pending simulates external work that is still running.\nCommand completion does not mean that external work has finished.", ["run", "sample-collector"]),
@@ -227,7 +227,7 @@ is cloned. The basic exercise has two Jobs; --advanced uses all eight sample Job
 ```sh
 mb doctor examples/sample-collector.yaml
 mb prepare examples/sample-collector.yaml
-mb plan examples/sample-collector.yaml
+mb plan sample-collector
 mb dry-run sample-collector --test test_pass --test test_pending
 mb run sample-collector
 mb status sample-collector

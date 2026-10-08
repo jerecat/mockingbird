@@ -99,7 +99,7 @@ def test_virtual_operator_lifecycle(tmp_path):
     transcript = []
 
     def cli(command, *args, expected=0, config=path):
-        result = subprocess.run([sys.executable, '-m', 'mockingbird.cli', command, (str(config) if command in {'prepare', 'plan', 'doctor', 'all'} else yaml.safe_load(config.read_text())['plan']), *map(str, args)],
+        result = subprocess.run([sys.executable, '-m', 'mockingbird.cli', command, (str(config) if command in {'prepare', 'doctor', 'all'} else yaml.safe_load(config.read_text())['plan']), *map(str, args)],
                                 cwd=tmp_path, env=env, capture_output=True, text=True, timeout=20)
         transcript.append({'command': command, 'args': list(map(str, args)), 'exit': result.returncode,
                            'stdout': result.stdout, 'stderr': result.stderr})

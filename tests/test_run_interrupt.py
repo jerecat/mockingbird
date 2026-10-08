@@ -53,7 +53,7 @@ def test_sigint_drains_current_job_and_preserves_partial_collection(tmp_path):
                               text=True, timeout=10)
 
     for cycle in ("prepare", "setup", "plan"):
-        completed = cli(cycle, "test" if cycle == "setup" else str(definition))
+        completed = cli(cycle, "test" if cycle in {"setup", "plan"} else str(definition))
         assert completed.returncode == 0, completed.stderr
 
     process = subprocess.Popen(

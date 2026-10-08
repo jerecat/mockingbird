@@ -56,7 +56,7 @@ def test_json_is_opt_in_and_parseable(session):
     assert prepared.returncode == 0
     assert json.loads(prepared.stdout)["schema_version"] == 2
     for cycle in ("setup", "plan", "run"):
-        assert cli(cycle, definition if cycle in {"prepare", "plan", "doctor", "all"} else "test").returncode == 0
+        assert cli(cycle, definition if cycle in {"prepare", "doctor", "all"} else "test").returncode == 0
     for cycle in ("status", "collect"):
         output = cli(cycle, "test", "--json")
         assert output.returncode == 0 and isinstance(json.loads(output.stdout), dict)
@@ -65,7 +65,7 @@ def test_json_is_opt_in_and_parseable(session):
 def test_missing_plan_does_not_repeat_successful_setup(session):
     definition, cli = session
     for cycle in ("prepare", "setup"):
-        assert cli(cycle, definition if cycle in {"prepare", "plan", "doctor", "all"} else "test").returncode == 0
+        assert cli(cycle, definition if cycle in {"prepare", "doctor", "all"} else "test").returncode == 0
     output = cli("run", "test")
     assert output.returncode == 1
     assert "mb plan" in output.stderr and "mb setup" not in output.stderr
@@ -87,7 +87,7 @@ def test_user_errors_have_no_traceback(session, kind):
         definition.write_text(yaml.safe_dump(data))
     else:
         for cycle in ("prepare", "setup", "plan"):
-            assert cli(cycle, definition if cycle in {"prepare", "plan", "doctor", "all"} else "test").returncode == 0
+            assert cli(cycle, definition if cycle in {"prepare", "doctor", "all"} else "test").returncode == 0
         args = (["run", "test", "--test", "unknown"] if kind == "selection"
                 else ["status", "test", "--run-dir", "missing-run"])
     output = cli(*args)
@@ -105,7 +105,7 @@ def test_debug_preserves_traceback(session):
 def test_stale_plan_recovery_after_reprepare(session):
     definition, cli = session
     for cycle in ("prepare", "setup", "plan", "prepare"):
-        assert cli(cycle, definition if cycle in {"prepare", "plan", "doctor", "all"} else "test").returncode == 0
+        assert cli(cycle, definition if cycle in {"prepare", "doctor", "all"} else "test").returncode == 0
     output = cli("run", "test")
     assert output.returncode == 1 and "plan is stale" in output.stderr
     commands = [shlex.split(line.strip())[1:] for line in output.stderr.splitlines() if line.startswith("  mb ")]

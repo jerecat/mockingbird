@@ -34,7 +34,7 @@ command-line arguments, so `args` is empty in the YAML definition.
 ```sh
 mb doctor examples/sample-collector.yaml
 mb prepare examples/sample-collector.yaml
-mb plan examples/sample-collector.yaml
+mb plan sample-collector
 mb run sample-collector
 ```
 

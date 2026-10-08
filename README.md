@@ -40,14 +40,14 @@ name to continue its history; choose another name for another plan.
 
 ```sh
 mb prepare regression.yaml   # Contains plan: smoke
-mb plan regression.yaml
+mb plan smoke
 mb run smoke
 mb collect smoke
 mb status smoke --history
 ```
 
 MB chooses the storage paths. Editing YAML alone has no effect on an already
-confirmed plan. `mb plan` explicitly confirms new contents; `mb run` uses the
+confirmed plan. `mb plan PLAN` rereads the YAML registered by prepare and explicitly confirms new contents; `mb run` uses the
 saved plan. Each run retains the exact plan it used and its results, even if the
 YAML is later edited or deleted. Optional `mb setup smoke` runs saved preparation
 commands between prepare and plan.
@@ -63,9 +63,10 @@ mb collect smoke            # Collect that same run using its saved plan and cwd
 
 Storage remains under the original project's `work/<plan>/`. Registrations live
 in `~/.local/state/mockingbird/plans/`; `MB_STATE_DIR` can select a different
-absolute state directory. Existing 0.6 local plans can be registered by running
-`mb plan <definition.yaml>` once from their original project directory, without
-repeating prepare or changing their run history. See the named-plan guide for
+absolute state directory. Existing local plans whose registration is missing can be registered with
+`mb prepare <definition.yaml>` from their original project directory, followed
+by optional setup and `mb plan PLAN`. Preparation is refreshed; run history is retained.
+See the named-plan guide for
 missing locations, name conflicts, and optional cleanup.
 
 Read [Named plans and execution history](Documentation/Named_Plans.md) for the
@@ -265,14 +266,14 @@ Prepare acquires sources only when no checkout exists. Existing Git/SVN working
 trees are reused without updates or deletion, including local edits and build
 outputs. To change revisions, use Git/SVN yourself or prepare another named plan.
 Recorded revisions are prepare-time metadata, not snapshots of source contents.
-Mockingbird does not track edits made before or during run. See
+Run-start Git HEAD and dirty observations are saved in run.json; edits during run are not tracked. See
 [ADR 0011](Documentation/ADR/0011-reuse-user-managed-source-trees.md).
 
 ```bash
 mockingbird doctor regression.yaml
 mockingbird prepare regression.yaml
 mockingbird setup smoke
-mockingbird plan regression.yaml
+mockingbird plan smoke
 mockingbird dry-run smoke
 mockingbird run smoke --interactive
 mockingbird collect smoke
@@ -311,7 +312,7 @@ Job IDs should be stable and human-readable. Do not embed timestamp/PID/run path
 ```bash
 mockingbird run smoke --test pcie/dma/write/seed-001
 mockingbird run smoke --match 'pcie/*'
-mockingbird plan regression.yaml --write-selection run.txt
+mockingbird plan smoke --write-selection run.txt
 vim run.txt
 mockingbird run smoke --selection run.txt
 mockingbird run smoke --failed-from work/smoke/runs/<explicit-run>/result.json

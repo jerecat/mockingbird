@@ -46,7 +46,7 @@ def resolve(name):
         raise ValueError(
             f"plan {name!r} is not registered.\n"
             "For a new plan, run mb prepare <definition.yaml> from its project directory.\n"
-            "For an existing local plan, run mb plan <definition.yaml> once from its original project directory.")
+            "To restore a registration, run mb prepare <definition.yaml> from its original project directory.")
     workspace = Path(entry["directory"]) / "work" / name
     if not (workspace / ".reg").is_dir():
         raise FileNotFoundError(

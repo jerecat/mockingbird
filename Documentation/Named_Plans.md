@@ -26,7 +26,7 @@ original working directory. Named commands then work from any directory:
 
 ```sh
 mb prepare regression.yaml
-mb plan regression.yaml
+mb plan smoke
 mb dry-run smoke
 mb run smoke
 mb collect smoke
@@ -44,7 +44,7 @@ an already confirmed plan.
 | --- | --- |
 | `prepare YAML` | Acquire or reuse sources and record the prepared environment |
 | `setup PLAN` | Execute the preparation commands saved by prepare |
-| `plan YAML` | Resolve and validate execution settings, then confirm the complete plan |
+| `plan PLAN` | Resolve and validate execution settings, then confirm the complete plan |
 | `dry-run PLAN` | Preview the confirmed Jobs and explicit selection |
 | `run PLAN` | Execute the confirmed plan and save a copy in a new run |
 | `collect PLAN` | Obtain unresolved results using the selected run's own plan |
@@ -54,17 +54,21 @@ The `plan` key is required. Names contain 1-128 ASCII letters, digits, dots,
 underscores or hyphens, starting with a letter or digit. Source `name` and Job
 `id` keep their existing meanings.
 
-A YAML filename is provenance, not identity. Two YAMLs with `plan: smoke` confirm
-the same named plan in the user's registry, even from different directories. The last
-successful confirmation supplies the next run. Editing, renaming or deleting
-YAML after confirmation does not change execution or prevent result inspection.
-Run does not reread YAML, compare edits, or offer to confirm implicitly.
+Prepare registers the absolute YAML path and original project directory. Subsequent
+`plan PLAN` reads that registered YAML again and confirms its contents. All other
+named operations use saved records, not the live YAML. A missing YAML or a changed
+`plan:` identity makes confirmation fail, without replacing the confirmed plan.
+To move or replace the YAML, explicitly run `prepare NEW_PATH`; successful preparation
+updates the registered path, reuses existing source trees and requires setup (if
+configured) and plan again. Source trees and previous runs are retained.
 
 ```sh
-mb plan a.yaml     # Contains plan: smoke
-mb run smoke      # Executes a's confirmed contents
-mb plan b.yaml     # Also contains plan: smoke
-mb run smoke      # Executes b's confirmed contents
+mb prepare plan/xxx.yml   # Contains plan: smoke
+mb plan smoke
+mb run smoke
+# Edit execution.jobs in plan/xxx.yml
+mb plan smoke
+mb run smoke
 ```
 
 A failed confirmation returns an error and leaves the last successfully
@@ -84,7 +88,7 @@ before confirmation. Execution and scheduler edits need only plan.
 There are no YAML workspace or run-root settings. The first prepare registers
 the name in `~/.local/state/mockingbird/plans/<plan>.json`, recording the absolute
 project directory and original YAML path. Each name identifies one plan for this
-user. Later prepare/plan/all with the same name use the original project, even
+user. Later prepare/all with the same name use the original project, even
 when the input YAML or the calling terminal is elsewhere. A new plan needs a
 different name. MB looks up the registration; it does not search parent or nearby
 directories or silently switch to a local copy.
@@ -119,12 +123,11 @@ not change the command cwd. Wrappers can change directory explicitly.
 
 ## Existing plans and cleanup
 
-For a plan prepared before name registration was introduced, run
-`mb plan /path/to/definition.yaml` once **from the original project directory**.
-This registers the existing location and confirms the supplied YAML; it does
-not repeat source acquisition or setup, move files, or alter older runs. It
-requires the existing preparation to be usable. After that, use its name from
-any directory. An explicit `--run-dir` still works without registration.
+For an old local plan or a deleted registration, run `mb prepare /path/to/definition.yaml`
+from the original project directory, followed by setup if configured and `mb plan PLAN`.
+This reuses sources and preserves historical runs, but refreshes preparation evidence.
+`plan` no longer accepts a YAML path. Explicit `--run-dir` inspection still works
+without registration.
 
 If two older project directories already contain the same plan name, registration
 does not merge them. Prepare/plan/all from the conflicting local environment
@@ -208,7 +211,7 @@ The same confirmed plan and explicit selection produce the same resolved Job
 contracts. Each execution still has a new run ID and timestamps. Test outcomes,
 capacity availability and external completion times can differ.
 
-Source evidence is observed at prepare time. Scripts, tools, binaries, inherited
+Prepared source evidence is observed at prepare time; optional run-start observations are stored separately in run.json. Scripts, tools, binaries, inherited
 process environment and external systems remain project-managed. Exact rebuild
 or replay requires the project to pin and retain those inputs. A mutable file
 path alone does not identify its bytes. MB does not copy complete source trees,
@@ -256,3 +259,20 @@ New prepared contexts use schema 2 and `plan` instead of `name`; plan, run and r
 use schema 3. Per-run `plan.json` embeds the context, so new runs do not write a
 second context.json copy. Legacy runs retain their original context.json.
 The previous `last_result.json` pointer is no longer used or written.
+
+## Run-start source observations
+
+Each run saves optional provider observations in `run.json` under
+`source_observations`, keyed by source name. Git records `prepared_commit`
+(from the latest successful preparation used by the confirmed plan),
+`current_commit` and `dirty`. These are displayed before dispatch. Dirty includes
+staged, unstaged and untracked changes, excluding ignored files. It is relative
+to current HEAD, not a comparison with the prepared working tree. Reprepare
+refreshes the baseline; old run records remain unchanged.
+
+Observation failure records null/unknown values and an error without blocking
+execution. Each Git query has a 10-second timeout. No fetch, checkout or reset
+is performed. Diffs, ignored build products and edits during execution are not
+captured; this is provenance, not a source snapshot or reproducibility guarantee.
+Providers may implement optional `observe(source)`; providers without it continue
+unchanged. `doctor YAML` and `all YAML` remain pre-preparation entry points.
