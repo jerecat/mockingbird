@@ -20,6 +20,10 @@ class ExecutionAdapter(ABC):
             )
         ]
 
+    def export_jobs(self, jobs: list[dict[str, Any]]) -> dict[str, Any]:
+        """Return an execution YAML contract for resolved saved Jobs."""
+        raise ValueError("execution adapter does not support saving resolved Jobs")
+
     @abstractmethod
     def setup(self, context: dict[str, Any]) -> None: ...
 
@@ -89,6 +93,10 @@ class SourceProvider(ABC):
                 message="source provider does not implement a connection probe",
             )
         ]
+
+    def export_source(self, source, prepared, observation):
+        """Optionally pin an exported source in place; return limitations."""
+        return [f"source {source['name']!r}: provider cannot pin run-time state; original settings retained"]
 
     def observe(self, source: dict[str, Any]) -> dict[str, Any] | None:
         """Optional read-only run-start evidence; None means unsupported."""

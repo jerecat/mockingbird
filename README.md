@@ -320,6 +320,19 @@ mockingbird run smoke --failed-from work/smoke/runs/<explicit-run>/result.json
 
 There is intentionally no implicit "latest failed" source.
 
+## Save a run for another workspace
+
+```sh
+mb save smoke --as smoke-repro --output repro.yml
+mb save smoke --run <run-id> --test test_a --as smoke-repro --output repro.yml
+```
+
+Exports the saved run's selected contracts and recorded Git commits as a new
+YAML. Dirty or unknown sources produce warnings, also retained as YAML comments.
+No registration, preparation or execution occurs. Existing output files are never
+replaced. Review environment-specific paths before using the normal prepare,
+optional setup, plan, run and collect workflow. See [Save a run as a new plan](Documentation/Save_Plan.md).
+
 ## Advanced Python adapter process execution
 
 Normal users should use the declarative execution contract above. For a custom

@@ -49,6 +49,10 @@ def _resolve_command(argv, cwd):
 class Adapter(ExecutionAdapter):
     """Expand declarative contracts at plan time; never infer test outcomes."""
 
+    def export_jobs(self, jobs):
+        return {"jobs": [{"id": job["id"], **copy.deepcopy(job["payload"]),
+                          "metadata": copy.deepcopy(job.get("metadata", {}))} for job in jobs]}
+
     def plan(self, context):
         config = _mapping(context["execution"].get("config", {}), "execution", _FIELDS | {"defaults", "jobs"})
         # Top-level common fields remain supported as shorthand defaults.

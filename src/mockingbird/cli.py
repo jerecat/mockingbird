@@ -125,6 +125,13 @@ def build_parser() -> argparse.ArgumentParser:
     _add_selection_args(run)
     run.add_argument("--interactive", action="store_true", help="show checklist and ask before run")
 
+    save = sub.add_parser("save", help="save a run's selected Jobs as a new plan YAML")
+    save.add_argument("definition", metavar="PLAN")
+    save.add_argument("--as", dest="new_name", required=True, metavar="NEW_PLAN")
+    save.add_argument("--output", required=True, metavar="YAML")
+    save.add_argument("--run", help="run ID; defaults to latest-started run")
+    save.add_argument("--test", action="append", dest="test_ids", help="Job ID from this run; repeatable")
+
     collect = sub.choices["collect"]
     collect_run = collect.add_mutually_exclusive_group()
     collect_run.add_argument("--run-dir", help="explicit run directory (including old runs)")
@@ -345,7 +352,7 @@ def _dispatch(args, parser) -> None:
         from .tutorial import run_tutorial
         run_tutorial(args.directory, args.yes, args.advanced)
         return
-    named = args.command in {"setup", "plan", "run", "dry-run", "collect", "status"}
+    named = args.command in {"setup", "plan", "run", "dry-run", "collect", "status", "save"}
     if named:
         # Explicit run paths can refer to another operator's or legacy evidence;
         # inspecting them must neither require nor change our name registration.
@@ -365,6 +372,19 @@ def _dispatch(args, parser) -> None:
         if Path(run_id).name != run_id or run_id in {".", ".."} or "\\" in run_id:
             raise ValueError("--run must be a run ID, not a path; use --run-dir for a path")
         args.run_dir = str(run_root_path(defn) / run_id)
+
+    if args.command == "save":
+        from .save import save_plan
+        result = save_plan(defn, args.new_name, args.output,
+                           run_dir=getattr(args, "run_dir", None), test_ids=args.test_ids)
+        print(f"Source run: {result['run_id']}")
+        print(f"Jobs: {result['jobs']}")
+        print(f"Created: {args.output}")
+        print(f"Plan: {args.new_name}")
+        for warning in result['warnings']:
+            print(f"Warning: {warning}", file=sys.stderr)
+        _next("prepare", args.output)
+        return
 
     if args.command == "doctor":
         checks = run_doctor(defn)

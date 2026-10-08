@@ -68,6 +68,22 @@ class Provider(SourceProvider):
             CheckResult(component, "repository", "PASS", "repository reachable without interactive prompt"),
         ]
 
+    def export_source(self, source, prepared, observation):
+        warnings = []
+        name = source['name']
+        current = observation.get('current_commit')
+        if current:
+            source['revision'] = current
+        else:
+            if prepared.get('resolved_revision'):
+                source['revision'] = prepared['resolved_revision']
+            warnings.append(f"source {name!r}: run-time HEAD unknown; using preparation revision when available")
+        if observation.get('dirty') is True:
+            warnings.append(f"source {name!r} was dirty; uncommitted changes are not included")
+        elif observation.get('dirty') is not False:
+            warnings.append(f"source {name!r}: clean/dirty state unknown; working-tree changes are not included")
+        return warnings
+
     def observe(self, source):
         observation = {"prepared_commit": source.get("resolved_revision"),
                        "current_commit": None, "dirty": None}
