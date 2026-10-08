@@ -62,7 +62,7 @@ def test_virtual_operator_lifecycle(tmp_path):
     project.write_text(PROJECT)
     ids = ['compile', 'pause', 'sim_pass', 'sim_late', 'sim_fail', 'sim_retry', 'cleanup']
     definition = {
-        'name': 'virtual-nightly',
+        'plan': 'virtual-nightly',
         'sources': [],
         'execution': {
             'defaults': {
@@ -72,14 +72,25 @@ def test_virtual_operator_lifecycle(tmp_path):
             },
             'jobs': [
                 {'id': 'compile', 'collect': {'mode': 'no-check'}},
-                {'id': 'pause', 'command': [sys.executable, '-c', 'import time;time.sleep(0.01)'],
-                 'args': [], 'collect': {'mode': 'no-check'}},
-                'sim_pass', 'sim_late', 'sim_fail', 'sim_retry',
+                {
+                    'id': 'pause',
+                    'command': [sys.executable, '-c', 'import time;time.sleep(0.01)'],
+                    'args': [],
+                    'collect': {'mode': 'no-check'},
+                },
+                'sim_pass',
+                'sim_late',
+                'sim_fail',
+                'sim_retry',
                 {'id': 'cleanup', 'collect': {'mode': 'no-check'}},
             ],
         },
-        'scheduler': {'capacity_provider': 'command', 'max_parallel': 1, 'poll_interval_s': 0.001,
-                      'config': {'command': [sys.executable, str(project), 'capacity'], 'timeout_s': 5}},
+        'scheduler': {
+            'capacity_provider': 'command',
+            'max_parallel': 1,
+            'poll_interval_s': 0.001,
+            'config': {'command': [sys.executable, str(project), 'capacity'], 'timeout_s': 5},
+        },
     }
     path = tmp_path / 'regression.yaml'
     path.write_text(yaml.safe_dump(definition, sort_keys=False))
@@ -88,7 +99,7 @@ def test_virtual_operator_lifecycle(tmp_path):
     transcript = []
 
     def cli(command, *args, expected=0, config=path):
-        result = subprocess.run([sys.executable, '-m', 'mockingbird.cli', command, str(config), *map(str, args)],
+        result = subprocess.run([sys.executable, '-m', 'mockingbird.cli', command, (str(config) if command in {'prepare', 'plan', 'doctor', 'all'} else yaml.safe_load(config.read_text())['plan']), *map(str, args)],
                                 cwd=tmp_path, env=env, capture_output=True, text=True, timeout=20)
         transcript.append({'command': command, 'args': list(map(str, args)), 'exit': result.returncode,
                            'stdout': result.stdout, 'stderr': result.stderr})
@@ -102,7 +113,7 @@ def test_virtual_operator_lifecycle(tmp_path):
         return [json.loads(line) for line in (tmp_path / 'external/events.jsonl').read_text().splitlines()]
 
     def current_run():
-        return Path(read(tmp_path / 'work/.reg/last_run.json')['run_dir'])
+        return Path(read(tmp_path / 'work/virtual-nightly/.reg/last_run.json')['run_dir'])
 
     cli('doctor')
     # Reset the fake capacity source after its doctor probe for deterministic steps.
@@ -111,7 +122,7 @@ def test_virtual_operator_lifecycle(tmp_path):
     cli('prepare')
     cli('setup')
     cli('plan')
-    plan = read(tmp_path / 'work/.reg/plan.json')
+    plan = read(tmp_path / 'work/virtual-nightly/.reg/plan.json')
     assert [job['id'] for job in plan['jobs']] == ids
     assert all(set(job['payload']) == {'command', 'args', 'args_suffix', 'timeout_s', 'collect'} for job in plan['jobs'])
     cli('dry-run')
@@ -180,7 +191,7 @@ def test_virtual_operator_lifecycle(tmp_path):
     assert retry_result['tests'][0]['artifacts'] == ['external://' + retry_run.name + '/sim_fail']
 
     # A malformed contract is rejected in plan, with no accidental submissions.
-    definition['workspace'] = 'bad-work'
+    definition['plan'] = 'bad'
     definition['execution']['jobs'][0]['timeuot_s'] = 5
     bad = tmp_path / 'bad.yaml'
     bad.write_text(yaml.safe_dump(definition))

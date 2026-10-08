@@ -1,6 +1,4 @@
-name: linux-sanity
-workspace: ./work
-run_root: ./runs
+plan: linux-sanity
 sources: []
 
 # Normal integration path: declare the command contract only.

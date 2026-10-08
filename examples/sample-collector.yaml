@@ -1,6 +1,4 @@
-name: sample-collector
-workspace: ./work/sample-collector
-run_root: ./runs/sample-collector
+plan: sample-collector
 sources: []
 
 execution:

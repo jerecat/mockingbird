@@ -11,7 +11,7 @@ def test_doctor_checks_linux_sanity_without_preparing_workspace(tmp_path, monkey
     definition = tmp_path / "regression.yaml"
     definition.write_text(
         """
-name: doctor-demo
+plan: doctor-demo
 sources: []
 execution:
   adapter: demo_linux
@@ -38,6 +38,7 @@ def test_doctor_reports_missing_execution_command(tmp_path, monkeypatch):
     definition = tmp_path / "regression.yaml"
     definition.write_text(
         """
+plan: doctor-missing
 sources: []
 execution:
   adapter: demo_linux
@@ -64,7 +65,7 @@ def test_doctor_accepts_declarative_command_contract_without_project_python(tmp_
     definition = tmp_path / "regression.yaml"
     definition.write_text(
         """
-name: declarative-doctor
+plan: declarative-doctor
 sources: []
 execution:
   command: ["./run.sh"]

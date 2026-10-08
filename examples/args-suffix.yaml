@@ -1,6 +1,4 @@
-name: args-suffix
-workspace: ./work/args-suffix
-run_root: ./runs/args-suffix
+plan: args-suffix
 
 # Print the received arguments; no simulator or collector is required.
 execution:

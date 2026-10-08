@@ -27,7 +27,7 @@ def test_context_accepts_unbounded_mixed_sources(monkeypatch, tmp_path: Path):
     definition_file = tmp_path / "regression.yaml"
     definition_file.write_text(
         """
-name: mixed
+plan: mixed
 sources:
   - {name: dut, provider: alpha, url: u1, revision: r1}
   - {name: tb, provider: beta, url: u2, revision: r2}
@@ -47,5 +47,6 @@ scheduler:
 
     assert [item["name"] for item in context["sources"]] == ["dut", "tb", "fw"]
     assert [item["provider"] for item in context["sources"]] == ["alpha", "beta", "alpha"]
-    assert (tmp_path / "work" / "sources" / "dut").is_dir()
-    assert Path(context["paths"]["workspace"]) == tmp_path / "work"
+    assert (tmp_path / "work/mixed" / "sources" / "dut").is_dir()
+    assert Path(context["paths"]["workspace"]) == tmp_path / "work/mixed"
+

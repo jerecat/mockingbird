@@ -150,7 +150,7 @@ If a result is not ready, return `CollectionAttempt` with state `PENDING`.
 If collection itself fails, return `CollectionAttempt` with state `ERROR`.
 Both are unresolved outcomes and are retried in a later collect cycle.
 Core also records collector exceptions or invalid responses as collection errors.
-See the schema 2 examples below. Execution return codes are evidence; only the
+See the repeatable collection examples below. Execution return codes are evidence; only the
 project-owned collector decides whether they imply a final test result.
 
 The minimum collected result contract is `Job ID + canonical status + list[str]`
@@ -308,7 +308,7 @@ and add project-side tests using `mockingbird.testing`. See
 `Adapter_Conformance_Testing.md`.
 
 
-## Repeatable collection contract (schema 2)
+## Repeatable collection contract (schema 2 and 3)
 
 Core calls collect with one unresolved execution at a time, in selected order.
 Return exactly one matching TestResult or CollectionAttempt:

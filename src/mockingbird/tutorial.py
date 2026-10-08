@@ -51,7 +51,7 @@ def _closing(root: Path, complete: bool) -> None:
     print(f"  {shlex.join(['cd', str(root)])}")
     print("Read GUIDE.md for the full sequence and how to continue.")
     print("MB context/plan: work/sample-collector/.reg/")
-    print("MB records/logs: runs/sample-collector/<run-id>/")
+    print("MB records/logs: work/sample-collector/runs/<run-id>/")
     print("Project artifacts: work/sample-results/<run-id>/<job-id>/")
     print("\nOptional cleanup, only when you no longer need these files:")
     print(f"  {shlex.join(['cd', str(root.parent)])}")
@@ -99,8 +99,8 @@ def run_tutorial(directory: str | None = None, automatic: bool = False, advanced
         print(f"\nCreated: {root}")
         print(f"Commands run with cwd: {root}")
         print(f"Open examples/sample-collector.yaml to inspect the {count} Jobs.")
-        print("sources: [] uses existing scripts. workspace holds preparation metadata;")
-        print("run_root holds run records. The scripts choose their own artifact directory.")
+        print("plan: sample-collector keeps MB data under work/sample-collector/.")
+        print("sources: [] uses existing scripts. Each run keeps its plan and records under runs/ there.")
         print("Each step below prints the ordinary command you can also run yourself.")
 
         def step(title, explanation, args, expected=0, helper=False):
@@ -133,16 +133,16 @@ def run_tutorial(directory: str | None = None, automatic: bool = False, advanced
             ("2. Prepare", "Save context in work/sample-collector/.reg/. No source clone is needed.", ["prepare", DEFINITION]),
             ("3. Plan", f"Resolve defaults and validate {count} complete Job contracts; nothing executes yet.", ["plan", DEFINITION]),
             ("4. Preview a selection", f"Preview test_pass and test_pending without executing them. The next run uses all {count} Jobs.",
-             ["dry-run", DEFINITION, "--test", "test_pass", "--test", "test_pending"]),
-            ("5. Run", f"Execute {count} commands serially. test_pending simulates external work that is still running.\nCommand completion does not mean that external work has finished.", ["run", DEFINITION]),
-            ("6. Status before collection", "Execution records exist; no results have been collected. Status reads saved observations, not liveness.", ["status", DEFINITION]),
+             ["dry-run", "sample-collector", "--test", "test_pass", "--test", "test_pending"]),
+            ("5. Run", f"Execute {count} commands serially. test_pending simulates external work that is still running.\nCommand completion does not mean that external work has finished.", ["run", "sample-collector"]),
+            ("6. Status before collection", "Execution records exist; no results have been collected. Status reads saved observations, not liveness.", ["status", "sample-collector"]),
         ]
         for title, explanation, args in stages:
             if not step(title, explanation, args):
                 return
         run_dir = Path(json.loads((root / "work/sample-collector/.reg/last_run.json").read_text())["run_dir"])
-        collect = ["collect", DEFINITION, "--run-dir", str(run_dir)]
-        status = ["status", DEFINITION, "--run-dir", str(run_dir), "--details"]
+        collect = ["collect", "sample-collector", "--run-dir", str(run_dir)]
+        status = ["status", "sample-collector", "--run-dir", str(run_dir), "--details"]
         first = ("Expected: PASS 2, FAIL 1, ERROR 1, SKIP 1, PENDING 1, collection errors 2.\n"
                  "No-check contributes a PASS without inspecting evidence. Exit 2 means unresolved results."
                  if advanced else
@@ -216,9 +216,9 @@ is cloned. The basic exercise has two Jobs; --advanced uses all eight sample Job
 mb doctor examples/sample-collector.yaml
 mb prepare examples/sample-collector.yaml
 mb plan examples/sample-collector.yaml
-mb dry-run examples/sample-collector.yaml --test test_pass --test test_pending
-mb run examples/sample-collector.yaml
-mb status examples/sample-collector.yaml
+mb dry-run sample-collector --test test_pass --test test_pending
+mb run sample-collector
+mb status sample-collector
 ```
 
 Run executes the commands. Command completion does not mean that external work
@@ -227,7 +227,7 @@ has finished. Use the run directory printed by run, replacing `<run-id>` below.
 ## Collect 1/2: get the results available now
 
 ```sh
-mb collect examples/sample-collector.yaml --run-dir runs/sample-collector/<run-id>
+mb collect sample-collector --run-dir work/sample-collector/runs/<run-id>
 ```
 
 {first}
@@ -246,8 +246,8 @@ sample convention. In real use, your external system finishes the work.
 ## Collect 2/2: get the remaining result
 
 ```sh
-mb collect examples/sample-collector.yaml --run-dir runs/sample-collector/<run-id>
-mb status examples/sample-collector.yaml --run-dir runs/sample-collector/<run-id> --details
+mb collect sample-collector --run-dir work/sample-collector/runs/<run-id>
+mb status sample-collector --run-dir work/sample-collector/runs/<run-id> --details
 ```
 
 {last}
@@ -266,19 +266,19 @@ cannot be collected. Invoking tutorial again creates a new exercise, not a resum
 ## Paths and further exercises
 
 - work/sample-collector/.reg/: MB context, plan, state and latest-run pointer.
-- runs/sample-collector/<run-id>/: MB records, logs and result.json.
+- work/sample-collector/runs/<run-id>/: MB records, logs and result.json.
 - work/sample-results/<run-id>/<job-id>/: project result.txt, sim.log, tarmac.log,
   mock wave.fsdb and collector_calls.txt (counts collection calls).
 - examples/: editable copies of the YAML and scripts.
 
 Commands use the invocation directory saved at prepare time as cwd. The sample
-scripts locate their results using MB_RUN_ID and MB_JOB_ID. Changing YAML needs
-prepare/plan again (plus setup when configured); contracts do not snapshot script contents.
+scripts locate their results using MB_RUN_ID and MB_JOB_ID. Editing YAML alone does not affect execution. Confirm execution edits with mb plan.
+Preparation changes require prepare/setup before plan. Script contents remain user-managed.
 
 Optional separate exercise: `mb tutorial --advanced` includes FAIL/ERROR/SKIP,
 no-check and collector fault recovery. Both modes collect exactly twice.
-To inspect JSON: `mb status examples/sample-collector.yaml --json`.
-For a smaller NEW run: `mb run examples/sample-collector.yaml --test test_pass`.
+To inspect JSON: `mb status sample-collector --json`.
+For a smaller NEW run: `mb run sample-collector --test test_pass`.
 
 ## Cleanup is optional
 

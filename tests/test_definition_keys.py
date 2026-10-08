@@ -8,9 +8,11 @@ from mockingbird.context import load_definition, prepare
 
 
 def valid(tmp_path):
-    return {'workspace': str(tmp_path/'work'),
-            'execution': {'command': [sys.executable, '-c', 'pass'], 'timeout_s': 2, 'jobs': ['a']},
-            'scheduler': {'capacity_provider': 'fixed'}}
+    return {
+        'plan': 'test',
+        'execution': {'command': [sys.executable, '-c', 'pass'], 'timeout_s': 2, 'jobs': ['a']},
+        'scheduler': {'capacity_provider': 'fixed'},
+    }
 
 
 @pytest.mark.parametrize('key', ['setpu', 'schedular', 'workspce', 'unexpected', '_invocation_dir'])

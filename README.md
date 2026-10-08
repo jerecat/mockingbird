@@ -2,7 +2,7 @@
 
 A deliberately small, contract-driven regression orchestrator prototype.
 
-Current prototype version: **0.5.0**.
+Current prototype version: **0.6.0**.
 
 ## Try it interactively
 
@@ -35,35 +35,26 @@ Generalize only after the same real problem appears repeatedly.
 
 See `Documentation/Design_Principles.md`.
 
-Core owns **when** to prepare, setup, plan, select, schedule, run, and collect.
-It does not know how VCS/QEMU/a board/formal tool starts, what a testcase command
-means, how project PASS/FAIL is parsed, whether sources are Git/SVN, or how a
-compute farm measures load.
+Write a named plan, confirm it, execute it, and inspect its results. Keep the
+name to continue its history; choose another name for another plan.
 
-```text
-regression.yaml
-      |
-    doctor             non-destructive connection check
-      |
-   prepare  --> context.json
-      |
-    setup (when configured; custom adapter hooks also require it)
-      |
-     plan   --> plan.json
-      |
- select / dry-run
-      |
-     run    --> run.json + executions.json + per-job work/log/artifact dirs
-      |
-   collect  --> result.json
+```sh
+mb prepare regression.yaml   # Contains plan: smoke
+mb plan regression.yaml
+mb run smoke
+mb collect smoke
+mb status smoke --history
 ```
 
-The evidence model remains:
+MB chooses the storage paths. Editing YAML alone has no effect on an already
+confirmed plan. `mb plan` explicitly confirms new contents; `mb run` uses the
+saved plan. Each run retains the exact plan it used and its results, even if the
+YAML is later edited or deleted. Optional `mb setup smoke` runs saved preparation
+commands between prepare and plan.
 
-```text
-Context -> Plan -> Run -> Result
-```
-
+Read [Named plans and execution history](Documentation/Named_Plans.md) for the
+complete workflow and migration from 0.5. Core owns lifecycle and record keeping;
+project commands and plugins own tool, source, capacity and result semantics.
 
 Start with [From shell commands to Mockingbird](Documentation/From_Shell_to_Mockingbird.md)
 for a step-by-step explanation of script paths, worktrees, Jobs, and collectors.
@@ -74,6 +65,7 @@ Projects that already have a command-line entry point should not need
 Mockingbird Python code.
 
 ```yaml
+plan: smoke
 execution:
   command: ["./run.sh"]
   timeout_s: 600
@@ -177,7 +169,7 @@ CLI registration tests that import Python 3.11's `tomllib`. Without the
 are needed, including for the lifecycle side-effect tests.
 
 Verified on Linux with Python 3.10.19, PyYAML 5.4.1 and pytest 9.0.3:
-291 tests passed (the two CLI registration tests excluded). This records the
+307 tests passed (the two CLI registration tests excluded). This records the
 suite at verification time; the count will grow as tests are added. Python
 versions below 3.10 have not been verified.
 
@@ -205,59 +197,43 @@ Git progress. No flag is required; `prepare --json` keeps stdout as JSON.
 For git-repo XML manifests, see [Repo sources](Documentation/Repo_Sources.md)
 and examples/repo-sources.yaml. Git, SVN and repo sources can coexist.
 
-After editing standard command execution settings, use plan then run; prepare
-is not needed again. Interactive run offers to update a changed plan, while
-non-interactive run stops with instructions. See the
-[editing and troubleshooting guide](Documentation/From_Shell_to_Mockingbird.md#editing-and-diagnosing-your-first-run).
+After editing execution or scheduler settings, explicitly confirm with plan.
+Run uses the last successfully confirmed plan, without reading or comparing YAML.
+Sources/setup changes still need preparation. See the
+[editing guide](Documentation/From_Shell_to_Mockingbird.md#editing-and-diagnosing-your-first-run).
 
 To locate project results from existing stdout, use
 [the collector-from-log example](Documentation/Collector_From_Logs.md).
 The producer does not need to write an MB-specific mapping file.
 
-## Workspace/run layout
+## Storage and saved evidence
 
-Relative paths are based on the directory where `mockingbird` is invoked.
+MB uses `work/<plan>/` under the directory where it is invoked. YAML filenames
+and directories do not determine identity. No workspace/run-root configuration
+is needed.
 
-```text
-$PWD/
-  regression.yaml
-  work/
-    sources/
-    exec/              # Created for custom adapters only
-    .reg/
-      context.json
-      plan.json
-      state.json
-  runs/
-    <run-id>/
-      context.json
-      plan.json
-      run.json
-      executions.json
-      collection.json
-      result.json
-      jobs/
-        <safe-job-directory>/
-          execution.json
-          collection.json
-          work/
-          artifacts/
-          logs/
-            stdout.log
-            stderr.log
-```
+| Data | Path |
+| --- | --- |
+| Prepared environment and current plan | `work/<plan>/.reg/` |
+| Acquired sources | `work/<plan>/sources/<source-name>/` |
+| Plan used by one execution | `work/<plan>/runs/<run-id>/plan.json` |
+| Execution record | `work/<plan>/runs/<run-id>/run.json` |
+| Collection result | `work/<plan>/runs/<run-id>/result.json` |
+| Per-Job records/logs | `work/<plan>/runs/<run-id>/jobs/<safe-job-directory>/` |
 
-Job IDs are never trusted directly as filesystem paths; core allocates a safe,
-deterministic directory name per selected Job.
+The saved plan embeds the complete context and resolved Jobs. Each run keeps a
+copy before dispatch. Per-Job execution/collection files are checkpoints; the
+run-level executions.json and collection.json are derived views. Job IDs are
+never used directly as directory paths. Project-generated files remain under
+the control of project scripts.
 
-For new runs, per-Job execution/collection files are the recovery checkpoints;
-run-level JSON files are derived views. A failed prepare blocks setup/plan/run
-until prepare succeeds again. Do not overlap prepare/setup/run in one workspace.
-See [ADR 0010](Documentation/ADR/0010-checkpoint-ownership-and-prepare-validity.md).
+`mb status smoke --plan` shows the confirmed plan. Add `--run <run-id>` to inspect
+the plan used by a past run. `mb status smoke --history` lists runs and results.
+All these operations work without the original YAML.
 
 ## Lifecycle
 
-`mb run` shows command progress. Use `mb status <definition>` from another
+`mb run` shows command progress. Use `mb status <plan>` from another
 terminal to inspect the latest saved execution and collection states, even before
 the first collect. See [Execution and collection status](Documentation/Execution_Status.md).
 
@@ -271,7 +247,7 @@ exercises every final status, and demonstrates retrying pending/failed collectio
 
 Prepare acquires sources only when no checkout exists. Existing Git/SVN working
 trees are reused without updates or deletion, including local edits and build
-outputs. To change revisions, use Git/SVN yourself or choose a new workspace.
+outputs. To change revisions, use Git/SVN yourself or prepare another named plan.
 Recorded revisions are prepare-time metadata, not snapshots of source contents.
 Mockingbird does not track edits made before or during run. See
 [ADR 0011](Documentation/ADR/0011-reuse-user-managed-source-trees.md).
@@ -279,12 +255,12 @@ Mockingbird does not track edits made before or during run. See
 ```bash
 mockingbird doctor regression.yaml
 mockingbird prepare regression.yaml
-mockingbird setup regression.yaml
+mockingbird setup smoke
 mockingbird plan regression.yaml
-mockingbird dry-run regression.yaml
-mockingbird run regression.yaml --interactive
-mockingbird collect regression.yaml
-mockingbird status regression.yaml
+mockingbird dry-run smoke
+mockingbird run smoke --interactive
+mockingbird collect smoke
+mockingbird status smoke
 ```
 
 Or:
@@ -317,12 +293,12 @@ Job IDs should be stable and human-readable. Do not embed timestamp/PID/run path
 ## Selection
 
 ```bash
-mockingbird run regression.yaml --test pcie/dma/write/seed-001
-mockingbird run regression.yaml --match 'pcie/*'
+mockingbird run smoke --test pcie/dma/write/seed-001
+mockingbird run smoke --match 'pcie/*'
 mockingbird plan regression.yaml --write-selection run.txt
 vim run.txt
-mockingbird run regression.yaml --selection run.txt
-mockingbird run regression.yaml --failed-from runs/<explicit-run>/result.json
+mockingbird run smoke --selection run.txt
+mockingbird run smoke --failed-from work/smoke/runs/<explicit-run>/result.json
 ```
 
 There is intentionally no implicit "latest failed" source.

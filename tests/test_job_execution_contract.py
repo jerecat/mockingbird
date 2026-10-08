@@ -12,7 +12,7 @@ from mockingbird.context import load_definition, prepare
 def _write(path: Path, job_id: str):
     path.write_text(
         f"""
-name: job-contract
+plan: job-contract
 sources: []
 execution:
   adapter: demo_linux
@@ -67,3 +67,4 @@ def test_job_id_rejects_leading_or_trailing_whitespace(tmp_path, monkeypatch):
     lifecycle.setup(defn)
     with pytest.raises(ValueError, match="whitespace"):
         lifecycle.create_plan(defn)
+

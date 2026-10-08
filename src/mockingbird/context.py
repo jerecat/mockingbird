@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import copy
+import re
+import sys
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from difflib import get_close_matches
 from pathlib import Path
@@ -10,7 +13,7 @@ import yaml
 
 from . import __version__
 from .errors import PrerequisiteError
-from .io import read_json, write_json
+from .io import file_lock, read_json, write_json
 from .plugins import load_source_provider
 from .setup_contract import resolve_setup, setup_required
 from .scheduler import validate_max_parallel
@@ -34,10 +37,15 @@ def load_definition(path: str | Path) -> dict[str, Any]:
     return data
 
 
-_DEFINITION_KEYS = {"name", "workspace", "run_root", "sources", "setup", "execution", "scheduler"}
+_DEFINITION_KEYS = {"plan", "meta", "sources", "setup", "execution", "scheduler"}
 
 
 def _validate_definition_keys(defn, *, internal=False):
+    removed = set(defn) & {"name", "workspace", "run_root"}
+    if removed:
+        raise ValueError("obsolete definition field(s): " + ", ".join(sorted(removed)) +
+                         "; use 'plan: <name>'; MB stores this plan under ./work/<name>/ "
+                         "and its runs under ./work/<name>/runs/")
     allowed = _DEFINITION_KEYS | ({"_definition_path", "_invocation_dir"} if internal else set())
     unknown = set(defn) - allowed
     if unknown:
@@ -55,12 +63,24 @@ def _from_invocation(defn: dict[str, Any], value: str) -> Path:
     return p.resolve()
 
 
+def plan_name(value: Any) -> str:
+    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", value):
+        raise ValueError("plan must be 1-128 letters, digits, dots, underscores or hyphens, "
+                         "starting with a letter or digit")
+    return value
+
+
+def plan_target(name: str, directory: str | Path | None = None) -> dict[str, Any]:
+    """Locate a named plan without opening its original YAML."""
+    return {"plan": plan_name(name), "_invocation_dir": str(Path(directory or Path.cwd()).resolve())}
+
+
 def workspace_path(defn: dict[str, Any]) -> Path:
-    return _from_invocation(defn, defn.get("workspace", "./work"))
+    return _from_invocation(defn, "work") / plan_name(defn.get("plan"))
 
 
 def run_root_path(defn: dict[str, Any]) -> Path:
-    return _from_invocation(defn, defn.get("run_root", "./runs"))
+    return workspace_path(defn) / "runs"
 
 
 def metadata_path(defn: dict[str, Any]) -> Path:
@@ -106,6 +126,9 @@ def _normalize_execution(execution: Any) -> dict[str, Any]:
 
 def validate_definition(defn: dict[str, Any]) -> None:
     _validate_definition_keys(defn, internal=True)
+    plan_name(defn.get("plan"))
+    if not isinstance(defn.get("meta", {}), dict):
+        raise ValueError("meta must be a mapping")
     sources = list(defn.get("sources", []))
     if not all(isinstance(item, dict) for item in sources):
         raise ValueError("sources must be a list of mappings")
@@ -131,8 +154,8 @@ def provisional_context(defn: dict[str, Any]) -> dict[str, Any]:
     scheduler["max_parallel"] = int(scheduler.get("max_parallel", 1))
     scheduler["poll_interval_s"] = float(scheduler.get("poll_interval_s", 1.0))
     return {
-        "schema_version": 1,
-        "name": defn.get("name", "regression"),
+        "schema_version": 2,
+        "plan": defn["plan"],
         "doctor": True,
         "definition_path": defn["_definition_path"],
         "invocation_dir": defn["_invocation_dir"],
@@ -149,8 +172,27 @@ def provisional_context(defn: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+@contextmanager
+def prepared_environment(defn, *, exclusive=False):
+    metadata = metadata_path(defn)
+    if not metadata.is_dir():
+        load_context(defn)
+    with file_lock(metadata / "environment.lock", shared=not exclusive,
+                   message="plan environment is busy; finish active preparation/execution/collection first"):
+        yield
+
+
 def prepare(defn: dict[str, Any]) -> dict[str, Any]:
     validate_definition(defn)
+    metadata_path(defn).mkdir(parents=True, exist_ok=True)
+    with prepared_environment(defn, exclusive=True):
+        existing = metadata_path(defn) / "context.json"
+        if existing.exists():
+            validate_definition_identity(defn, read_json(existing))
+        return _prepare(defn)
+
+
+def _prepare(defn: dict[str, Any]) -> dict[str, Any]:
     workspace = workspace_path(defn)
     run_root = run_root_path(defn)
     sources_root = workspace / "sources"
@@ -194,10 +236,10 @@ def prepare(defn: dict[str, Any]) -> dict[str, Any]:
     scheduler["poll_interval_s"] = float(scheduler.get("poll_interval_s", 1.0))
 
     context = {
-        "schema_version": 1,
-        "name": defn.get("name", "regression"),
+        "schema_version": 2,
+        "plan": defn["plan"],
         "prepared_at": _now(),
-        "orchestrator": {"name": "mockingbird", "version": __version__},
+        "orchestrator": {"name": "mockingbird", "version": __version__, "python": sys.version},
         "definition_path": defn["_definition_path"],
         "invocation_dir": defn["_invocation_dir"],
         "paths": {
@@ -219,6 +261,8 @@ def prepare(defn: dict[str, Any]) -> dict[str, Any]:
 
 
 def _preparation_steps(defn):
+    if "execution" not in defn:
+        return ("prepare", "plan")
     context = {"execution": _normalize_execution(defn.get("execution")),
                "setup": resolve_setup(defn.get("setup", {}))}
     return ("prepare", "setup", "plan") if setup_required(context) else ("prepare", "plan")
@@ -232,12 +276,14 @@ def load_context(defn: dict[str, Any]) -> dict[str, Any]:
         raise PrerequisiteError("context not prepared", *_preparation_steps(defn))
     context = read_json(path)
     validate_definition_identity(defn, context)
+    if Path(context["paths"]["workspace"]).resolve() != workspace_path(defn).resolve():
+        raise PrerequisiteError("prepared environment was moved; prepare it in this directory", *_preparation_steps(defn))
     return context
 
 
 def validate_definition_identity(defn: dict[str, Any], context: dict[str, Any]) -> None:
-    if Path(context["definition_path"]).resolve() != Path(defn["_definition_path"]).resolve():
-        raise RuntimeError("saved context belongs to a different definition; use its definition or prepare this one explicitly")
+    if context.get("plan", context.get("name")) != defn["plan"]:
+        raise ValueError("saved record belongs to a different plan")
 
 
 def update_state(defn: dict[str, Any], **values: Any) -> dict[str, Any]:
@@ -268,9 +314,8 @@ def preparation_contract(context):
         sources.append(source)
     execution = context["execution"]
     return {
-        "name": context["name"], "paths": context["paths"],
+        "plan": context["plan"], "paths": context["paths"],
         "sources": sources, "setup": context.get("setup", {"jobs": []}),
-        "scheduler": context["scheduler"],
         # Custom adapter setup may depend on its entire config.
         "execution": {"adapter": "command"} if execution["adapter"] == "command" else execution,
     }
@@ -283,8 +328,10 @@ def planning_context(defn, saved):
     baseline = saved.get("preparation_contract", preparation_contract(saved))
     if preparation_contract(current) != baseline:
         raise PrerequisiteError(
-            "preparation settings changed (sources, setup, scheduler, paths, name or adapter)",
+            "preparation settings changed (sources, setup or adapter)",
             *_preparation_steps(defn))
     context = copy.deepcopy(saved)
     context["execution"] = current["execution"]
+    context["scheduler"] = current["scheduler"]
+    context["definition_path"] = defn["_definition_path"]
     return context

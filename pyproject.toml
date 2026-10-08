@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mockingbird"
-version = "0.5.0"
+version = "0.6.0"
 description = "Small, contract-driven regression orchestrator with reproducible context"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -21,3 +21,4 @@ mb = "mockingbird.cli:main"
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "-ra"
+

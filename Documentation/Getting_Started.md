@@ -62,21 +62,16 @@ inside that project-owned wrapper.
 
 ## 5. Inspect evidence
 
-```text
-work/.reg/context.json
-work/.reg/plan.json
-runs/<run-id>/context.json
-runs/<run-id>/plan.json
-runs/<run-id>/run.json
-runs/<run-id>/executions.json
-runs/<run-id>/collection.json
-runs/<run-id>/result.json
-runs/<run-id>/jobs/<job>/
-  work/
-  artifacts/
-  logs/stdout.log
-  logs/stderr.log
+```sh
+mb status linux-sanity --history
+mb status linux-sanity --run <run-id>
+mb status linux-sanity --run <run-id> --plan
 ```
+
+Records live under `work/linux-sanity/runs/<run-id>/`: plan.json, run.json,
+executions.json, collection.json, result.json and per-Job logs/checkpoints.
+The plan contains the full saved context. Original YAML is not required for
+inspection or collection.
 
 ## 6. Exercise lifecycle manually
 
@@ -84,9 +79,9 @@ runs/<run-id>/jobs/<job>/
 mockingbird doctor examples/sanity-linux.yaml
 mockingbird prepare examples/sanity-linux.yaml
 mockingbird plan examples/sanity-linux.yaml
-mockingbird dry-run examples/sanity-linux.yaml
-mockingbird run examples/sanity-linux.yaml --interactive
-mockingbird collect examples/sanity-linux.yaml
+mockingbird dry-run linux-sanity
+mockingbird run linux-sanity --interactive
+mockingbird collect linux-sanity
 ```
 
 ## 7. Run mockingbird through itself

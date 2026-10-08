@@ -16,10 +16,14 @@ def test_capacity_and_execution_use_prepared_cwd_from_another_directory(tmp_path
     (caller / 'slots.py').write_text("raise SystemExit(7)")
     path = prepared / 'jobs.yaml'
     path.write_text(json.dumps({
-        'workspace': str(tmp_path/'work'), 'run_root': str(tmp_path/'runs'),
-        'execution': {'command': [sys.executable, '-c', "from pathlib import Path; Path('run-used').touch()"],
-                      'args': [], 'timeout_s': 2, 'jobs': ['job']},
-        'scheduler': {'capacity_provider': 'command', 'config': {'command': [sys.executable, 'slots.py']}}
+        'plan': 'test',
+        'execution': {
+            'command': [sys.executable, '-c', "from pathlib import Path; Path('run-used').touch()"],
+            'args': [],
+            'timeout_s': 2,
+            'jobs': ['job'],
+        },
+        'scheduler': {'capacity_provider': 'command', 'config': {'command': [sys.executable, 'slots.py']}},
     }))
     monkeypatch.chdir(prepared)
     definition = load_definition(path)
@@ -28,7 +32,7 @@ def test_capacity_and_execution_use_prepared_cwd_from_another_directory(tmp_path
     assert not doctor_failed(run_doctor(definition))  # provisional context binds supplied invocation
     assert (prepared/'capacity-used').exists()
     (prepared/'capacity-used').unlink()
-    executions, _, _ = lifecycle.run(load_definition(path))
+    executions, _, _ = lifecycle.run(definition)
     assert executions[0].observation['returncode'] == 0
     assert (prepared/'capacity-used').exists() and (prepared/'run-used').exists()
     assert not (caller/'capacity-used').exists() and not (caller/'run-used').exists()

@@ -1,6 +1,4 @@
-name: linux-command-fail-demo
-workspace: ./work
-run_root: ./runs
+plan: linux-command-fail-demo
 sources: []
 
 execution:

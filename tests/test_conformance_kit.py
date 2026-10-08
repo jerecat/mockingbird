@@ -30,7 +30,7 @@ def _definition(tmp_path: Path) -> Path:
     path = tmp_path / "regression.yaml"
     path.write_text(
         """
-name: conformance
+plan: conformance
 sources: []
 execution:
   adapter: demo_linux
@@ -86,3 +86,4 @@ def test_result_artifact_contract_is_opaque_string_list():
         "logs/sim.log",
         "artifact://project-owned-reference",
     ]
+

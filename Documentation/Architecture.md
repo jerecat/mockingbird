@@ -53,7 +53,7 @@ regression.yaml
 The durable evidence chain remains:
 
 ```text
-Context -> Plan -> Run -> Result
+Confirmed plan (including context) -> Run -> Result
 ```
 
 ## Core responsibility
@@ -165,7 +165,7 @@ project contract and is checked by the conformance kit under a fixed context.
 Core creates one isolated filesystem context per selected Job:
 
 ```text
-runs/<run-id>/jobs/<safe-id>/
+work/<plan>/runs/<run-id>/jobs/<safe-id>/
   work/
   artifacts/
   logs/
@@ -275,3 +275,10 @@ See ADR 0008 and ADR 0010 for checkpoint ownership and legacy compatibility.
 Declarative setup and failure invalidation are defined by
 [ADR 0012](ADR/0012-declarative-setup-and-retry.md). The standard command adapter
 requires no setup cycle when its top-level setup list is empty or omitted.
+
+## Named plans
+
+ADR 0014 defines plan-name identity and explicit confirmation. MB derives the
+workspace/run layout from the name; run consumes the entire saved plan without
+reading live YAML. A run retains its own plan, so replanning can proceed while
+an older run executes. See [Named plans](Named_Plans.md).

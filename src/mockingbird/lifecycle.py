@@ -1,18 +1,21 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import re
 import time
+from contextlib import nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from .adapter_utils.setup import execute_setup_job
 from .setup_contract import setup_required
-from .errors import PrerequisiteError, PlanChangedError
-from .context import load_context, load_state, metadata_path, update_state, validate_definition_identity, planning_context
-from .io import collection_lock, read_json, write_json
+from .errors import PrerequisiteError
+from .context import load_context, load_state, metadata_path, update_state, validate_definition_identity, planning_context, prepared_environment
+from .io import collection_lock, file_lock, read_json, write_json
 from .models import ExecutionContext, Job, JobExecution, TestResult
 from .plugins import load_adapter, load_capacity_provider
 from .scheduler import run_jobs, validate_max_parallel
@@ -30,7 +33,7 @@ def _now() -> str:
 def _timestamp_id(name: str) -> str:
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     safe = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in name)
-    return f"{stamp}_{safe}"
+    return f"{stamp}_{safe}_{uuid4().hex[:8]}"
 
 
 def _components(defn: dict[str, Any], context=None):
@@ -84,7 +87,12 @@ def _require_setup(context, state):
 
 
 def setup(defn: dict[str, Any], *, on_progress=None) -> Path | None:
-    context = planning_context(defn, load_context(defn))
+    with prepared_environment(defn, exclusive=True):
+        return _setup(defn, on_progress=on_progress)
+
+
+def _setup(defn, *, on_progress=None):
+    context = load_context(defn)
     if not setup_required(context):
         return None
     attempt = metadata_path(defn) / "setup" / _timestamp_id("setup")
@@ -129,55 +137,60 @@ def setup(defn: dict[str, Any], *, on_progress=None) -> Path | None:
 
 
 def create_plan(defn: dict[str, Any]) -> dict[str, Any]:
+    with prepared_environment(defn):
+        return _create_plan(defn)
+
+
+def _create_plan(defn):
     state = load_state(defn)
     context = planning_context(defn, load_context(defn))
     _require_setup(context, state)
 
     adapter = load_adapter(str(context["execution"]["adapter"]))
     plan_path = metadata_path(defn) / "plan.json"
-    try:
-        jobs = adapter.plan(context)
-        validate_jobs(jobs)
-    except Exception:
-        plan_path.unlink(missing_ok=True)
-        raise
+    jobs = adapter.plan(context)
+    validate_jobs(jobs)
 
+    context["setup_attempt"] = state.get("last_setup_dir")
     plan = {
-        "schema_version": 2,
+        "schema_version": 3,
+        "plan": defn["plan"],
         "generated_at": _now(),
-        "execution": context["execution"],
         "context_prepared_at": context["prepared_at"],
+        "context": context,
+        "definition": {key: copy.deepcopy(value) for key, value in defn.items() if not key.startswith("_")},
+        "meta": copy.deepcopy(defn.get("meta", {})),
         "jobs": [job.to_dict() for job in jobs],
     }
-    write_json(metadata_path(defn) / "plan.json", plan)
-    update_state(
-        defn,
-        plan_at=plan["generated_at"],
-        plan_context_prepared_at=context["prepared_at"],
-    )
+    # One atomic publication is the only commit point. There is no separate
+    # plan revision or mutable context to combine with this plan at run time.
+    write_json(plan_path, plan)
     return plan
 
 
 def load_plan(defn: dict[str, Any]) -> dict[str, Any]:
+    saved = load_context(defn)
+    _require_setup(saved, load_state(defn))
     path = metadata_path(defn) / "plan.json"
     if not path.exists():
-        context = planning_context(defn, load_context(defn))
-        state = load_state(defn)
-        _require_setup(context, state)
         raise PrerequisiteError("plan not created", "plan")
     plan = read_json(path)
-    if plan.get("schema_version") != 2:
-        raise PrerequisiteError("plan schema is obsolete", "plan")
-    saved = load_context(defn)
-    context = planning_context(defn, saved)
-    _require_setup(context, load_state(defn))
-    if plan.get("context_prepared_at") != context.get("prepared_at"):
-        raise PrerequisiteError("plan is stale for the current context", "plan")
-    planned_input = json.dumps(plan.get("execution", saved["execution"]), sort_keys=True)
-    current_input = json.dumps(context["execution"], sort_keys=True)
-    if planned_input != current_input:
-        raise PlanChangedError()
+    if plan.get("schema_version") != 3:
+        raise PrerequisiteError("plan schema is obsolete; confirm it again from YAML", "plan")
+    validate_definition_identity(defn, plan)
+    validate_definition_identity(defn, plan["context"])
+    if plan.get("context_prepared_at") != saved.get("prepared_at"):
+        raise PrerequisiteError("plan is stale for the prepared environment", "plan")
     return plan
+
+
+def saved_run_context(run_path: Path) -> dict:
+    """A run's own plan is authoritative, including during later collection."""
+    plan = read_json(run_path / "plan.json")
+    if plan.get("schema_version") == 3:
+        return plan["context"]
+    # Read old execution evidence without moving or rewriting its paths.
+    return read_json(run_path / "context.json")
 
 
 def plan_jobs(defn: dict[str, Any]) -> list[Job]:
@@ -186,60 +199,72 @@ def plan_jobs(defn: dict[str, Any]) -> list[Job]:
 
 
 def preview(defn: dict[str, Any], selection: Selection) -> tuple[dict, list[Job], dict]:
-    context = planning_context(defn, load_context(defn))
-    jobs = plan_jobs(defn)
+    plan = load_plan(defn)
+    context = copy.deepcopy(plan["context"])
+    jobs = [Job(**item) for item in plan["jobs"]]
     selected, selection_meta = select_jobs(jobs, selection)
     return context, selected, selection_meta
 
 
 def run(
-    defn: dict[str, Any], selection: Selection | None = None, *, on_progress=None
-) -> tuple[list[JobExecution], Path, dict]:
+    defn: dict[str, Any], selection: Selection | None = None, *, on_progress=None, confirm=None
+) -> tuple[list[JobExecution], Path, dict] | None:
+    with prepared_environment(defn):
+        return _run(defn, selection, on_progress=on_progress, confirm=confirm)
+
+
+def _run(defn, selection=None, *, on_progress=None, confirm=None):
     selection = selection or Selection()
     plan = load_plan(defn)
-    context = load_context(defn)
-    context["execution"] = plan.get("execution", context["execution"])
+    context = copy.deepcopy(plan["context"])
     context, adapter, capacity = _components(defn, context)
     validate_max_parallel(context["scheduler"]["max_parallel"])
     positive_seconds(context["scheduler"]["poll_interval_s"], "scheduler.poll_interval_s")
     jobs = [Job(**item) for item in plan["jobs"]]
     selected, selection_meta = select_jobs(jobs, selection)
 
-    run_id = _timestamp_id(str(context["name"]))
-    run_root = Path(context["paths"]["run_root"])
-    run_dir = run_root / run_id
-    run_dir.mkdir(parents=True, exist_ok=False)
+    # The CLI may ask about this exact plan/selection. Never reload either
+    # after confirmation: another terminal can confirm the next plan meanwhile.
+    if confirm is not None and not confirm(context, selected, selection_meta):
+        return None
 
-    execution_contexts = {
-        job.id: _execution_context(run_id, run_dir, index, job)
-        for index, job in enumerate(selected, start=1)
-    }
+    with file_lock(metadata_path(defn) / "start.lock", blocking=True):
+        run_id = _timestamp_id(str(context["plan"]))
+        run_root = Path(context["paths"]["run_root"])
+        run_dir = run_root / run_id
+        run_dir.mkdir(parents=True, exist_ok=False)
 
-    write_json(run_dir / "context.json", context)
-    write_json(run_dir / "plan.json", plan)
-    run_record = {
-        "schema_version": 2,
-        "run_id": run_id,
-        "checkpoint_storage": "per-job",
-        "name": context["name"],
-        "status": "RUNNING",
-        "started_at": _now(),
-        "finished_at": None,
-        "duration_s": None,
-        "selection": selection_meta,
-        "scheduler": {
-            "capacity_provider": context["scheduler"]["capacity_provider"],
-            "max_parallel": context["scheduler"]["max_parallel"],
-            "poll_interval_s": context["scheduler"]["poll_interval_s"],
-        },
-        "jobs": {
-            job.id: execution_contexts[job.id].evidence_paths()
-            for job in selected
-        },
-    }
-    write_json(run_dir / "run.json", run_record)
-    # Publish the current run before dispatch so another terminal can inspect it.
-    write_json(metadata_path(defn) / "last_run.json", {"run_dir": str(run_dir.resolve())})
+        execution_contexts = {
+            job.id: _execution_context(run_id, run_dir, index, job)
+            for index, job in enumerate(selected, start=1)
+        }
+
+        write_json(run_dir / "plan.json", plan)
+        run_record = {
+            "schema_version": 3,
+            "run_id": run_id,
+            "checkpoint_storage": "per-job",
+            "plan": context.get("plan", context.get("name")),
+            "status": "RUNNING",
+            "started_at": _now(),
+            "finished_at": None,
+            "duration_s": None,
+            "selection": selection_meta,
+            "scheduler": {
+                "capacity_provider": context["scheduler"]["capacity_provider"],
+                "max_parallel": context["scheduler"]["max_parallel"],
+                "poll_interval_s": context["scheduler"]["poll_interval_s"],
+            },
+            "jobs": {
+                job.id: execution_contexts[job.id].evidence_paths()
+                for job in selected
+            },
+        }
+        write_json(run_dir / "run.json", run_record)
+        # Publish the current run before dispatch so another terminal can inspect it.
+        write_json(metadata_path(defn) / "last_run.json", {"run_dir": str(run_dir.resolve())})
+
+        update_state(defn, last_run_dir=str(run_dir.resolve()), last_run_at=run_record["started_at"])
 
     scheduler = context["scheduler"]
     started = time.monotonic()
@@ -300,15 +325,6 @@ def run(
         run_record["finished_at"] = _now()
         run_record["duration_s"] = time.monotonic() - started
         write_json(run_dir / "run.json", run_record)
-        write_json(
-            metadata_path(defn) / "last_run.json",
-            {"run_dir": str(run_dir.resolve())},
-        )
-        update_state(
-            defn,
-            last_run_dir=str(run_dir.resolve()),
-            last_run_at=run_record["finished_at"],
-        )
         # Derived view only; collection never depends on its successful write.
         write_json(run_dir / "executions.json", [item.to_dict() for item in completed])
 
@@ -349,10 +365,16 @@ def _validate_results(
 def collect(
     defn: dict[str, Any], run_dir: str | Path | None = None
 ) -> tuple[dict[str, Any], Path]:
+    guard = prepared_environment(defn) if metadata_path(defn).is_dir() else nullcontext()
+    with guard:
+        return _collect(defn, run_dir)
+
+
+def _collect(defn, run_dir=None):
     run_path = _resolve_run_dir(defn, run_dir)
     with collection_lock(run_path):
         # Keep progress separate from the authoritative collection checkpoints.
-        context = read_json(run_path / "context.json")
+        context = saved_run_context(run_path)
         validate_definition_identity(defn, context)
         record = read_json(run_path / "run.json")
         if record.get("status") not in {"EXECUTED", "COLLECTED", "ERROR", "INTERRUPTED"}:
@@ -371,12 +393,12 @@ def collect(
 
 
 def _collect_locked(defn, run_path):
-    context = read_json(run_path / "context.json")
+    context = saved_run_context(run_path)
     validate_definition_identity(defn, context)
     run_record = read_json(run_path / "run.json")
     if run_record.get("status") not in {"EXECUTED", "COLLECTED", "ERROR", "INTERRUPTED"}:
         raise RuntimeError(f"run is not collectable; status={run_record.get('status')!r}: {run_path}")
-    if run_record.get("schema_version") != 2:
+    if run_record.get("schema_version") not in {2, 3}:
         raise RuntimeError("run schema is obsolete; use the previous version to collect this run")
     per_job = run_record.get("checkpoint_storage") == "per-job"
     selected = run_record["selection"]["selected_ids"]
@@ -453,9 +475,9 @@ def _collect_locked(defn, run_path):
     states = [journal["jobs"][job_id]["state"] for job_id in selected]
     complete = len(tests) == len(selected)
     result = {
-        "schema_version": 2,
+        "schema_version": 3,
         "run_id": run_record["run_id"],
-        "name": context["name"],
+        "plan": context.get("plan", context.get("name")),
         "generated_at": _now(),
         "started_at": run_record.get("started_at"),
         "finished_at": run_record.get("finished_at"),
@@ -479,6 +501,4 @@ def _collect_locked(defn, run_path):
     run_record["collected_at"] = result["generated_at"]
     run_record["result_status"] = result["status"]
     write_json(run_path / "run.json", run_record)
-    write_json(metadata_path(defn) / "last_result.json", {"result": str((run_path / "result.json").resolve())})
-    update_state(defn, last_result=str((run_path / "result.json").resolve()))
     return result, run_path

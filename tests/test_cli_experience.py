@@ -14,9 +14,9 @@ import yaml
 def session(tmp_path):
     definition = tmp_path / "jobs with spaces.yaml"
     definition.write_text(yaml.safe_dump({
-        "execution": {"command": [sys.executable, "-c", "pass"],
-                      "timeout_s": 2, "jobs": ["short", "a_longer_job"]},
-        "scheduler": {"capacity_provider": "fixed"},
+        'plan': 'test',
+        'execution': {'command': [sys.executable, '-c', 'pass'], 'timeout_s': 2, 'jobs': ['short', 'a_longer_job']},
+        'scheduler': {'capacity_provider': 'fixed'},
     }))
     env = dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[1] / "src"))
     def invoke(*args):
@@ -27,24 +27,26 @@ def session(tmp_path):
 
 def test_first_run_recovery_and_human_outputs(session):
     definition, cli = session
-    missing = cli("run", definition)
+    missing = cli("run", "test")
     assert missing.returncode == 1 and "Traceback" not in missing.stderr
     assert "context not prepared" in missing.stderr
+    assert cli("prepare", definition).returncode == 0
+    missing = cli("run", "test")
     commands = [shlex.split(line.strip())[1:] for line in missing.stderr.splitlines() if line.startswith("  mb ")]
-    assert [cmd[0] for cmd in commands] == ["prepare", "plan"]
+    assert [cmd[0] for cmd in commands] == ["plan"]
     for command in commands:
         completed = cli(*command)
         assert completed.returncode == 0, completed.stderr
         assert "Next: mb" in completed.stdout
         assert '"schema_version"' not in completed.stdout
-    run = cli("run", definition)
+    run = cli("run", "test")
     assert run.returncode == 0 and "Next: mb collect" in run.stdout
-    status = cli("status", definition)
+    status = cli("status", "test")
     assert status.returncode == 0
     rows = [line for line in status.stdout.splitlines() if line.startswith(("JOB ", "short ", "a_longer_job "))]
     assert len(rows) == 3
     assert rows[0].index("EXECUTION") == rows[1].index("RECORDED") == rows[2].index("RECORDED")
-    collected = cli("collect", definition)
+    collected = cli("collect", "test")
     assert collected.returncode == 0 and "Result: PASS (2 jobs)" in collected.stdout
 
 
@@ -52,19 +54,19 @@ def test_json_is_opt_in_and_parseable(session):
     definition, cli = session
     prepared = cli("prepare", definition, "--json")
     assert prepared.returncode == 0
-    assert json.loads(prepared.stdout)["schema_version"] == 1
+    assert json.loads(prepared.stdout)["schema_version"] == 2
     for cycle in ("setup", "plan", "run"):
-        assert cli(cycle, definition).returncode == 0
+        assert cli(cycle, definition if cycle in {"prepare", "plan", "doctor", "all"} else "test").returncode == 0
     for cycle in ("status", "collect"):
-        output = cli(cycle, definition, "--json")
+        output = cli(cycle, "test", "--json")
         assert output.returncode == 0 and isinstance(json.loads(output.stdout), dict)
 
 
 def test_missing_plan_does_not_repeat_successful_setup(session):
     definition, cli = session
     for cycle in ("prepare", "setup"):
-        assert cli(cycle, definition).returncode == 0
-    output = cli("run", definition)
+        assert cli(cycle, definition if cycle in {"prepare", "plan", "doctor", "all"} else "test").returncode == 0
+    output = cli("run", "test")
     assert output.returncode == 1
     assert "mb plan" in output.stderr and "mb setup" not in output.stderr
 
@@ -85,9 +87,9 @@ def test_user_errors_have_no_traceback(session, kind):
         definition.write_text(yaml.safe_dump(data))
     else:
         for cycle in ("prepare", "setup", "plan"):
-            assert cli(cycle, definition).returncode == 0
-        args = (["run", definition, "--test", "unknown"] if kind == "selection"
-                else ["status", definition, "--run-dir", "missing-run"])
+            assert cli(cycle, definition if cycle in {"prepare", "plan", "doctor", "all"} else "test").returncode == 0
+        args = (["run", "test", "--test", "unknown"] if kind == "selection"
+                else ["status", "test", "--run-dir", "missing-run"])
     output = cli(*args)
     assert output.returncode == 1 and "Error:" in output.stderr
     assert "Traceback" not in output.stderr
@@ -95,7 +97,7 @@ def test_user_errors_have_no_traceback(session, kind):
 
 def test_debug_preserves_traceback(session):
     definition, cli = session
-    for args in [("--debug", "run", definition), ("run", definition, "--debug")]:
+    for args in [("--debug", "run", "test"), ("run", "test", "--debug")]:
         output = cli(*args)
         assert output.returncode == 1 and "Traceback" in output.stderr
 
@@ -103,14 +105,14 @@ def test_debug_preserves_traceback(session):
 def test_stale_plan_recovery_after_reprepare(session):
     definition, cli = session
     for cycle in ("prepare", "setup", "plan", "prepare"):
-        assert cli(cycle, definition).returncode == 0
-    output = cli("run", definition)
+        assert cli(cycle, definition if cycle in {"prepare", "plan", "doctor", "all"} else "test").returncode == 0
+    output = cli("run", "test")
     assert output.returncode == 1 and "plan is stale" in output.stderr
     commands = [shlex.split(line.strip())[1:] for line in output.stderr.splitlines() if line.startswith("  mb ")]
     assert [cmd[0] for cmd in commands] == ["plan"]
     for command in commands:
         assert cli(*command).returncode == 0
-    assert cli("run", definition).returncode == 0
+    assert cli("run", "test").returncode == 0
 
 
 def test_json_redirects_plugin_messages(monkeypatch, capsys):
@@ -129,10 +131,10 @@ def test_json_redirects_plugin_messages(monkeypatch, capsys):
 
 def test_unexpected_error_has_debug_escape_hatch(monkeypatch, capsys):
     from mockingbird import cli
-    monkeypatch.setattr(sys, "argv", ["mb", "run", "example.yaml"])
+    monkeypatch.setattr(sys, "argv", ["mb", "run", "example"])
     def broken(_):
         raise KeyError("unexpected field")
-    monkeypatch.setattr(cli, "load_definition", broken)
+    monkeypatch.setattr(cli, "plan_target", broken)
     with pytest.raises(SystemExit) as error:
         cli.main()
     assert error.value.code == 1

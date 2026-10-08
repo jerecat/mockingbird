@@ -22,7 +22,7 @@ def test_command_setup_jobs_and_run_need_no_adapter_workspace(tmp_path):
 
 def test_prepare_preserves_existing_user_files_in_exec(tmp_path):
     d = definition(tmp_path)
-    old = tmp_path / 'work/exec'
+    old = tmp_path / 'work/A/exec'
     old.mkdir(parents=True)
     (old / 'user.txt').write_text('keep')
     prepare(d)

@@ -20,9 +20,9 @@ def prepared(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     path = tmp_path / "jobs.yaml"
     path.write_text(yaml.safe_dump({
-        "execution": {"command": [sys.executable, "-c", "pass"], "args": [],
-                      "timeout_s": 2, "jobs": ["a", "b"]},
-        "scheduler": {"capacity_provider": "fixed", "poll_interval_s": .001},
+        'plan': 'test',
+        'execution': {'command': [sys.executable, '-c', 'pass'], 'args': [], 'timeout_s': 2, 'jobs': ['a', 'b']},
+        'scheduler': {'capacity_provider': 'fixed', 'poll_interval_s': 0.001},
     }))
     defn = load_definition(path)
     prepare(defn)

@@ -35,22 +35,19 @@ def test_declarative_contract_runs_without_project_python(tmp_path, monkeypatch)
     definition_path.write_text(
         yaml.safe_dump(
             {
-                "name": "declarative-e2e",
-                "sources": [],
-                "execution": {
-                    "command": ["./run.sh"],
-                    "timeout_s": 5,
-                    "jobs": ["pass", "fail"],
-                    "collect": {
-                        "command": ["./collect.sh"],
-                        "timeout_s": 5,
-                    },
+                'plan': 'declarative-e2e',
+                'sources': [],
+                'execution': {
+                    'command': ['./run.sh'],
+                    'timeout_s': 5,
+                    'jobs': ['pass', 'fail'],
+                    'collect': {'command': ['./collect.sh'], 'timeout_s': 5},
                 },
-                "scheduler": {
-                    "capacity_provider": "fixed",
-                    "max_parallel": 1,
-                    "poll_interval_s": 0.01,
-                    "config": {"slots": 1},
+                'scheduler': {
+                    'capacity_provider': 'fixed',
+                    'max_parallel': 1,
+                    'poll_interval_s': 0.01,
+                    'config': {'slots': 1},
                 },
             }
         )

@@ -1,6 +1,4 @@
-name: mockingbird-self-host
-workspace: ./work-self
-run_root: ./runs-self
+plan: mockingbird-self-host
 sources: []
 
 execution:

@@ -45,9 +45,7 @@ Run the remaining commands in this guide from `lab`, with `mb` installed.
 Save this complete definition as `lab/regression.yaml`:
 
 ```yaml
-name: worktree-demo
-workspace: ./work/worktree-demo
-run_root: ./runs/worktree-demo
+plan: worktree-demo
 sources: []
 
 execution:
@@ -69,8 +67,7 @@ scheduler:
 | YAML field | Effect in this example |
 | --- | --- |
 | `sources: []` | Do not clone anything; the worktree already exists |
-| `workspace` | Store MB preparation metadata and the plan |
-| `run_root` | Put each new run's records under this directory |
+| `plan: worktree-demo` | Name the plan; MB keeps its data and runs under `work/worktree-demo/` |
 | `id: test_basic` | Identify this Job in execution and collection records |
 | `command` + `args` | Execute `sh ./worktrees/experiment/run.sh basic` |
 | `timeout_s: 60` | Bound the local command's execution time |
@@ -85,10 +82,10 @@ Run each lifecycle step:
 ```sh
 mb prepare regression.yaml
 mb plan regression.yaml
-mb dry-run regression.yaml
-mb run regression.yaml
-mb status regression.yaml
-mb collect regression.yaml
+mb dry-run worktree-demo
+mb run worktree-demo
+mb status worktree-demo
+mb collect worktree-demo
 ```
 
 Prepare saves context; plan validates and saves the Job contracts. This example
@@ -190,7 +187,7 @@ new run IDs; collect/status without `--run-dir` select the latest run. To collec
 an older run, use the explicit path printed by that run:
 
 ```sh
-mb collect regression.yaml --run-dir runs/worktree-demo/<run-id>
+mb collect worktree-demo --run-dir work/worktree-demo/runs/<run-id>
 ```
 
 ## 5. Know which directory owns what
@@ -208,8 +205,8 @@ CLI invocations also depends on where you invoke MB.
 | `worktrees/experiment/results/<run-id>/<job-id>/` | Results written by these example scripts |
 | `work/worktree-demo/.reg/` | MB's saved context, plan, state, and latest-run pointer |
 | `work/worktree-demo/exec/` | Custom adapter workspace; not created or used by the standard command adapter |
-| `runs/worktree-demo/<run-id>/` | MB execution records, collection records, and result.json |
-| `runs/worktree-demo/<run-id>/jobs/<safe-job-directory>/logs/` | Captured execution/collection stdout and stderr |
+| `work/worktree-demo/runs/<run-id>/` | MB execution records, collection records, and result.json |
+| `work/worktree-demo/runs/<run-id>/jobs/<safe-job-directory>/logs/` | Captured execution/collection stdout and stderr |
 
 MB also allocates per-Job `work/` and `artifacts/` directories for adapters. Their
 existence does not mean the command adapter changes into them or copies project
@@ -250,28 +247,26 @@ For capacity and asynchronous submission, use [Integration Guide](Integration_Gu
 
 ## Editing and diagnosing your first run
 
-For a prepared standard command setup, edit execution, then run:
+For a prepared standard command setup, edit the execution settings, then confirm:
 
-    mb plan my-run.yaml
-    mb run my-run.yaml
+```sh
+mb plan regression.yaml
+mb run worktree-demo
+mb collect worktree-demo
+mb status worktree-demo --history
+```
 
-Plan validates the current execution settings. It does not repeat source
-acquisition or successful setup. If you forget plan, an interactive run asks:
+Editing YAML alone does not alter the confirmed plan. Run uses the last successful
+confirmation and does not ask whether to update it. A failed confirmation keeps
+the prior plan intact. Changing the YAML filename or using another file with the
+same plan name is allowed. Each run keeps its own confirmed contents and results.
+Use `mb status worktree-demo --run <run-id> --plan` to inspect those contents.
 
-    Execution settings changed since plan.
-    Update the plan and run? [Y/n]
-
-Enter/Y updates and validates the plan before starting any Job. n or end of input
-cancels without execution. Invalid answers are prompted again. With non-terminal
-stdin (CI, pipes, or redirection), run stops and prints the plan command instead.
-Missing plans still require an explicit plan command. A new run starts from the
-selected list's beginning; it is not a continuation of an interrupted run.
-
-Preparation changes (sources, setup, scheduler, name, workspace/run paths, or
-adapter choice) still require prepare, then setup if needed, then plan.
-Custom Python adapter configuration also requires prepare/setup because its
-setup hook may depend on that configuration. Script/source file edits remain
-live and are not detected or hashed.
+Changes to sources, setup or adapter preparation requirements need prepare, then
+optional setup, then plan. Execution and scheduler edits need only plan. Custom
+adapter configuration may require setup because its hook can use that config.
+Script/source bytes and external tools remain project-managed. See
+[Named plans](Named_Plans.md) for reproducibility boundaries and migration.
 
 ### Arguments are a list, not a shell command line
 
@@ -299,9 +294,9 @@ Run prints an execution error's reason and its record/log paths immediately.
 For a nonzero exit or timeout, it also prints where to inspect the record and
 stderr. All Job output is saved under:
 
-    <run_root>/<run_id>/jobs/<safe-job-directory>/logs/stdout.log
-    <run_root>/<run_id>/jobs/<safe-job-directory>/logs/stderr.log
-    <run_root>/<run_id>/jobs/<safe-job-directory>/execution.json
+    work/<plan>/runs/<run_id>/jobs/<safe-job-directory>/logs/stdout.log
+    work/<plan>/runs/<run_id>/jobs/<safe-job-directory>/logs/stderr.log
+    work/<plan>/runs/<run_id>/jobs/<safe-job-directory>/execution.json
 
 If the command never launched, stdout/stderr may be empty; launch_error in
 execution.json records the cause. These are MB's command logs. Project-created

@@ -35,20 +35,20 @@ command-line arguments, so `args` is empty in the YAML definition.
 mb doctor examples/sample-collector.yaml
 mb prepare examples/sample-collector.yaml
 mb plan examples/sample-collector.yaml
-mb run examples/sample-collector.yaml
+mb run sample-collector
 ```
 
 Eight Jobs execute in list order. Copy the final directory name from the printed
 `run:` path. Replace the example ID below with the ID from your own run.
 
 Run prints each command's execution transitions. You can also use
-`mb status examples/sample-collector.yaml` before collecting: execution is finished
+`mb status sample-collector` before collecting: execution is finished
 but all eight collection outcomes are still uncollected. Command completion does
 not imply external completion. See [Execution and collection status](Execution_Status.md).
 
 ```sh
 RUN_ID=20261007_140000_000000_sample-collector
-RUN_DIR="runs/sample-collector/$RUN_ID"
+RUN_DIR="work/sample-collector/runs/$RUN_ID"
 ```
 
 ## 3. Inspect the project-owned files
@@ -72,9 +72,9 @@ returns exit code 0, independently of that verdict.
 ## 4. Collect results for the first time
 
 ```sh
-mb collect examples/sample-collector.yaml --run-dir "$RUN_DIR"
+mb collect sample-collector --run-dir "$RUN_DIR"
 echo $?
-mb status examples/sample-collector.yaml --run-dir "$RUN_DIR"
+mb status sample-collector --run-dir "$RUN_DIR"
 ```
 
 | Job | First outcome | Meaning |
@@ -104,9 +104,9 @@ does not copy the artifact files themselves.
 
 ```sh
 python3 examples/sample_finish.py "$RUN_ID"
-mb collect examples/sample-collector.yaml --run-dir "$RUN_DIR"
+mb collect sample-collector --run-dir "$RUN_DIR"
 echo $?
-mb status examples/sample-collector.yaml --run-dir "$RUN_DIR"
+mb status sample-collector --run-dir "$RUN_DIR"
 ```
 
 The finish helper changes only project-owned completion and fault markers.
@@ -147,6 +147,6 @@ Use `mb run` to create a new run when trying a different final verdict. Editing
 the original logs does not cause repeated collect to rejudge final results.
 Each run's files remain in its own directory.
 
-For collector reasons, use `mb status examples/sample-collector.yaml --details`.
+For collector reasons, use `mb status sample-collector --details`.
 Normal output uses human summaries; use `prepare --json` or `collect --json`
 when you need JSON on stdout. See [CLI output and recovery](CLI_Experience.md).

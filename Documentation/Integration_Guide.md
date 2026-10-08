@@ -14,7 +14,7 @@ Suppose the project already supports:
 
 Describe that directly:
 
-    name: soc-nightly
+    plan: soc-nightly
 
     sources: []
 
@@ -118,14 +118,14 @@ The normal asynchronous sequence is:
 
     mb doctor regression.yaml
     mb prepare regression.yaml
-    mb setup regression.yaml
+    mb setup soc-nightly
     mb plan regression.yaml
-    mb dry-run regression.yaml
-    mb run regression.yaml
+    mb dry-run soc-nightly
+    mb run soc-nightly
 
 After the project/system says results are ready:
 
-    mb collect regression.yaml --run-dir runs/<chosen-run>
+    mb collect soc-nightly --run <chosen-run>
 
 Repeat this command later for PENDING/collection-error Jobs. Mockingbird does not
 remain resident to poll the scheduler. mb all performs just one collection sweep;

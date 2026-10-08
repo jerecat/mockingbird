@@ -23,10 +23,10 @@ def test_prepare_json_with_real_git_progress(tmp_path):
     source = origin(tmp_path)
     definition = tmp_path / "jobs.yaml"
     definition.write_text(json.dumps({
-        "workspace": str(tmp_path / "work"),
-        "sources": [{"name": "repo", "provider": "git", "url": str(source), "revision": "main"}],
-        "execution": {"command": ["echo"], "timeout_s": 5, "jobs": ["a"]},
-        "scheduler": {"capacity_provider": "fixed"},
+        'plan': 'test',
+        'sources': [{'name': 'repo', 'provider': 'git', 'url': str(source), 'revision': 'main'}],
+        'execution': {'command': ['echo'], 'timeout_s': 5, 'jobs': ['a']},
+        'scheduler': {'capacity_provider': 'fixed'},
     }))
     env = dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[1] / "src"),
                LC_ALL="C")
@@ -38,4 +38,4 @@ def test_prepare_json_with_real_git_progress(tmp_path):
     assert isinstance(json.loads(result.stdout), dict)
     assert "Cloning into" in result.stderr
     assert "HEAD is now at" in result.stderr
-    assert (tmp_path / "work/sources/repo/source.txt").read_text() == "original"
+    assert (tmp_path / "work/test/sources/repo/source.txt").read_text() == "original"

@@ -17,13 +17,13 @@ def test_mock_simv_user_journey(tmp_path):
 
     def cli(cycle, *args, expected=0):
         proc = subprocess.run([sys.executable, "-m", "mockingbird.cli", cycle,
-                               "examples/sample-collector.yaml", *args],
+                               ("examples/sample-collector.yaml" if cycle in {"prepare", "plan", "doctor", "all"} else "sample-collector"), *args],
                               cwd=tmp_path, env=env, capture_output=True, text=True, timeout=20)
         assert proc.returncode == expected, proc.stdout + proc.stderr
 
     for cycle in ("prepare", "setup", "plan", "run"):
         cli(cycle)
-    rd = next((tmp_path / "runs/sample-collector").iterdir())
+    rd = next((tmp_path / "work/sample-collector/runs").iterdir())
     root = tmp_path / "work/sample-results" / rd.name
     executions = (rd / "executions.json").read_bytes()
     assert all(e["observation"]["returncode"] == 0 for e in json.loads(executions))

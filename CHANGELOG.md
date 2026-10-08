@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.0 — named plans and explicit confirmation
+
+- Replace top-level name with plan; MB derives all storage paths.
+- Confirm YAML explicitly, then run/inspect/collect by plan name.
+- Preserve the last successful confirmation on failure and each run's own plan.
+- Add status --history, --plan and --run; original YAML is not needed.
+- Permit replanning and independent runs while protecting MB preparation writes.
+- Keep latest-started run selection stable across out-of-order completion.
+- Read legacy schema-2 run records through explicit --run-dir.
+- See Documentation/Named_Plans.md for breaking changes and migration.
+
 ## Unreleased
 
 - Show serial command progress and publish the latest run before dispatch.

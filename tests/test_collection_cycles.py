@@ -17,8 +17,17 @@ def make_run(tmp_path, monkeypatch, jobs=None, collector=None):
     if collector:
         cfg["defaults"]["collect"] = {"command": [sys.executable, str(collector)], "timeout_s": 2}
     path = tmp_path / "regression.yaml"
-    path.write_text(yaml.safe_dump({"execution": cfg, "sources": [], "scheduler": {
-        "capacity_provider": "fixed", "max_parallel": 1, "poll_interval_s": 0.001, "config": {"slots": 1}}}))
+    path.write_text(yaml.safe_dump({
+        'plan': 'test',
+        'execution': cfg,
+        'sources': [],
+        'scheduler': {
+            'capacity_provider': 'fixed',
+            'max_parallel': 1,
+            'poll_interval_s': 0.001,
+            'config': {'slots': 1},
+        },
+    }))
     defn = load_definition(path)
     prepare(defn)
     lifecycle.setup(defn)
@@ -96,7 +105,7 @@ def test_execution_evidence_is_saved_before_next_job_and_survives_error(tmp_path
     monkeypatch.setattr(lifecycle, "load_adapter", lambda _: adapter)
     with pytest.raises(RuntimeError, match="executor broken"):
         lifecycle.run(defn)
-    run = next((tmp_path / "runs").iterdir())
+    run = next((tmp_path / "work/test/runs").iterdir())
     records = read_json(run / "executions.json")
     assert [r["job_id"] for r in records] == ["a", "b"]
     assert records[1]["observation"]["executor_error"]
@@ -113,15 +122,15 @@ def test_concurrent_collect_is_rejected(tmp_path, monkeypatch):
             lifecycle.collect(defn, run)
 
 
-def test_invalid_plan_does_not_leave_previous_plan_runnable(tmp_path, monkeypatch):
+def test_invalid_plan_keeps_previous_confirmation(tmp_path, monkeypatch):
     defn = make_run(tmp_path, monkeypatch)
     adapter = lifecycle.load_adapter("command")
     monkeypatch.setattr(adapter, "plan", lambda _: (_ for _ in ()).throw(ValueError("bad plan")))
     monkeypatch.setattr(lifecycle, "load_adapter", lambda _: adapter)
     with pytest.raises(ValueError):
         lifecycle.create_plan(defn)
-    with pytest.raises(RuntimeError, match="plan not created"):
-        lifecycle.run(defn)
+    executions, _, _ = lifecycle.run(defn)
+    assert [e.job_id for e in executions] == ["a", "b"]
 
 
 def test_cli_pending_exit_code_and_completed_noop(tmp_path, monkeypatch):
@@ -130,7 +139,7 @@ def test_cli_pending_exit_code_and_completed_noop(tmp_path, monkeypatch):
     script.write_text('print(\'{"status":"PENDING"}\')')
     defn = make_run(tmp_path, monkeypatch, ["a"], script)
     _, run, _ = lifecycle.run(defn)
-    monkeypatch.setattr(sys, "argv", ["mb", "collect", str(tmp_path / "regression.yaml"), "--run-dir", str(run)])
+    monkeypatch.setattr(sys, "argv", ["mb", "collect", "test", "--run-dir", str(run)])
     with pytest.raises(SystemExit) as exc:
         main()
     assert exc.value.code == 2

@@ -15,7 +15,7 @@ Do not use `mb all` for this exercise: it would wait at the same capacity gate.
 ```sh
 mb prepare examples/capacity-gate.yaml
 mb plan examples/capacity-gate.yaml
-mb run examples/capacity-gate.yaml
+mb run capacity-gate
 ```
 
 No setup list is configured. The first two submission commands return immediately.
@@ -35,7 +35,7 @@ command is checked every second. There is no automatic completion timer.
 ```sh
 python3 examples/sample_queue.py status
 python3 examples/sample_queue.py slots
-mb status examples/capacity-gate.yaml
+mb status capacity-gate
 ```
 
 The queue reports 2/2 occupied slots; slots prints `0`. MB status shows two saved
@@ -70,8 +70,8 @@ After terminal A returns, complete the remaining external work and collect:
 
 ```sh
 python3 examples/sample_queue.py finish "$RUN_ID" sim_b sim_c
-mb collect examples/capacity-gate.yaml --run-dir "runs/capacity-gate/$RUN_ID"
-mb status examples/capacity-gate.yaml --run-dir "runs/capacity-gate/$RUN_ID"
+mb collect capacity-gate --run-dir "work/capacity-gate/runs/$RUN_ID"
+mb status capacity-gate --run-dir "work/capacity-gate/runs/$RUN_ID"
 ```
 
 Expected: three PASS results. The collector reads queue state; it does not use
@@ -119,7 +119,7 @@ Do not run concurrent MB lifecycle operations on the same workspace.
 ## Files, interruption, and cleanup
 
 - `work/capacity-gate/`: MB preparation metadata.
-- `runs/capacity-gate/<run-id>/`: MB execution records, logs and collected results.
+- `work/capacity-gate/runs/<run-id>/`: MB execution records, logs and collected results.
 - `work/capacity-demo-queue/`: project queue state and lock, shared across runs.
 
 Ctrl+C stops MB submission but does not complete or cancel external Jobs. In this

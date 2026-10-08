@@ -18,8 +18,9 @@ INVALID = [0, -1, 2, 8, True, False, 1.0, 1.5, "1", "2", None]
 def test_definition_rejects_non_integer_one(value):
     with pytest.raises(ValueError, match="max_parallel must be the integer 1"):
         validate_definition({
-            "execution": {"command": ["true"], "timeout_s": 1, "jobs": ["a"]},
-            "scheduler": {"capacity_provider": "fixed", "max_parallel": value},
+            'plan': 'test',
+            'execution': {'command': ['true'], 'timeout_s': 1, 'jobs': ['a']},
+            'scheduler': {'capacity_provider': 'fixed', 'max_parallel': value},
         })
 
 
@@ -38,18 +39,19 @@ def test_run_rejects_invalid_frozen_context_before_creating_run(tmp_path, monkey
     monkeypatch.chdir(tmp_path)
     path = tmp_path / "regression.yaml"
     path.write_text(yaml.safe_dump({
-        "execution": {"command": ["true"], "timeout_s": 1, "jobs": ["a"]},
-        "scheduler": {"capacity_provider": "fixed", "config": {"slots": 1}},
+        'plan': 'test',
+        'execution': {'command': ['true'], 'timeout_s': 1, 'jobs': ['a']},
+        'scheduler': {'capacity_provider': 'fixed', 'config': {'slots': 1}},
     }))
     defn = load_definition(path)
     context = prepare(defn)
     assert context["scheduler"]["max_parallel"] == 1  # Omission is supported.
     lifecycle.setup(defn)
     lifecycle.create_plan(defn)
-    context_path = tmp_path / "work/.reg/context.json"
+    context_path = tmp_path / "work/test/.reg/plan.json"
     context = read_json(context_path)
-    context["scheduler"]["max_parallel"] = value
+    context["context"]["scheduler"]["max_parallel"] = value
     write_json(context_path, context)
     with pytest.raises(ValueError, match="max_parallel must be the integer 1"):
         lifecycle.run(defn)
-    assert list((tmp_path / "runs").iterdir()) == []
+    assert list((tmp_path / "work/test/runs").iterdir()) == []

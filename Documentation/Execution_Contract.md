@@ -11,7 +11,7 @@ A returning submit command does not imply external work has completed.
 
 ## Definition fields
 
-The YAML root accepts only `name`, `workspace`, `run_root`, `sources`, `setup`,
+The YAML root accepts only `plan`, `meta`, `sources`, `setup`,
 `execution`, and `scheduler`. Unknown or reserved root keys are rejected when
 loading the definition, before preparation or execution. Similar spellings receive
 a suggestion: `setpu` reports `did you mean 'setup'?` instead of silently skipping
@@ -39,7 +39,10 @@ execution:
 
 `mb plan` applies defaults, overwrites explicitly specified fields with Job
 values, validates every resolved contract, and writes plan.json only on success.
-A failed plan validation removes the old plan so it cannot accidentally run.
+A failed confirmation preserves the last successful plan. Run never reads live YAML.
+The required plan name selects `work/<plan>/`; MB chooses all record paths.
+Optional `meta` is a JSON-compatible mapping retained as project provenance.
+See [Named plans](Named_Plans.md) for identity, complete saved context and migration.
 No project command is executed by plan. `doctor` checks command availability;
 `dry-run` previews selection from an already validated plan.
 
@@ -74,7 +77,7 @@ execution.defaults. New definitions should use defaults.
 ## Execution evidence is not a test result
 
 One permitted Job invokes exactly one project command with command + args + args_suffix.
-The command runs from the invocation directory saved in context.json.
+The command runs from the invocation directory included in the confirmed plan.
 stdout/stderr are streamed to per-Job log files. The finite local timeout releases
 local execution resources; MB does not follow handed-off external work.
 
@@ -188,8 +191,8 @@ The plan preserves that choice explicitly; all execution evidence is still saved
 ## Repeated collect cycles on one run
 
 ```sh
-mb run regression.yaml
-mb collect regression.yaml --run-dir runs/<chosen-run>
+mb run smoke
+mb collect smoke --run <chosen-run>
 # Later, repeat exactly the same collect command.
 ```
 

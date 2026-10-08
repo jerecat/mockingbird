@@ -1,6 +1,4 @@
-name: repo-example
-workspace: ./work/repo-example
-run_root: ./runs/repo-example
+plan: repo-example
 
 # Replace with your manifest repository. Project paths come from its XML.
 sources:

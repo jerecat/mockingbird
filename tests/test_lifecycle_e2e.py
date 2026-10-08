@@ -15,25 +15,23 @@ def _write_definition(path: Path) -> None:
     path.write_text(
         yaml.safe_dump(
             {
-                "name": "e2e",
-                "workspace": "./work",
-                "run_root": "./runs",
-                "sources": [],
-                "execution": {
-                    "adapter": "demo_linux",
-                    "config": {
-                        "tests": [
-                            {"id": "mkdir_ok", "command": ["mkdir", "-p", "scratch"]},
-                            {"id": "list_ok", "command": ["ls", "-la"]},
-                            {"id": "intentional_fail", "command": ["sh", "-c", "exit 7"]},
-                        ]
+                'plan': 'e2e',
+                'sources': [],
+                'execution': {
+                    'adapter': 'demo_linux',
+                    'config': {
+                        'tests': [
+                            {'id': 'mkdir_ok', 'command': ['mkdir', '-p', 'scratch']},
+                            {'id': 'list_ok', 'command': ['ls', '-la']},
+                            {'id': 'intentional_fail', 'command': ['sh', '-c', 'exit 7']},
+                        ],
                     },
                 },
-                "scheduler": {
-                    "capacity_provider": "fixed",
-                    "max_parallel": 1,
-                    "poll_interval_s": 0.01,
-                    "config": {"slots": 2},
+                'scheduler': {
+                    'capacity_provider': 'fixed',
+                    'max_parallel': 1,
+                    'poll_interval_s': 0.01,
+                    'config': {'slots': 2},
                 },
             }
         )
@@ -72,7 +70,7 @@ def test_context_plan_run_result_evidence_chain_and_failed_rerun(tmp_path, monke
     for test in first_result["tests"]:
         assert test["artifacts"]
         assert all(isinstance(item, str) for item in test["artifacts"])
-    for name in ("context.json", "plan.json", "run.json", "executions.json", "result.json"):
+    for name in ("plan.json", "run.json", "executions.json", "result.json"):
         assert (first_run / name).exists()
 
     second_executions, second_run, meta = lifecycle.run(

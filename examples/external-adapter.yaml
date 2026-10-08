@@ -1,6 +1,4 @@
-name: external-adapter-demo
-workspace: ./work-external
-run_root: ./runs-external
+plan: external-adapter-demo
 sources: []
 
 execution:
@@ -20,3 +18,4 @@ scheduler:
   poll_interval_s: 0.1
   config:
     slots: 1
+

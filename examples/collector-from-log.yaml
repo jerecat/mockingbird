@@ -1,6 +1,4 @@
-name: collector-from-log
-workspace: ./work/collector-from-log
-run_root: ./runs/collector-from-log
+plan: collector-from-log
 sources: []
 setup:
   jobs: []

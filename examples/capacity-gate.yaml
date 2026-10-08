@@ -1,6 +1,4 @@
-name: capacity-gate
-workspace: ./work/capacity-gate
-run_root: ./runs/capacity-gate
+plan: capacity-gate
 sources: []
 
 execution:

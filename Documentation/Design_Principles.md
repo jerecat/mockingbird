@@ -249,3 +249,11 @@ responsibility: plan resolves and validates a complete contract for each Job.
 Execution evidence says what the executor did. The collector decides the result.
 No-check deliberately performs no judgement; a pending collection has no final
 result yet. All three remain associated by Job ID inside one run.
+
+## Principle 11: Follow explicit human operations
+
+Users write a plan, confirm it, execute it, inspect results, then edit or start
+another plan. Each operation should do exactly that. Confirmation is the explicit
+point at which edited YAML becomes execution intent. Run uses confirmed contents
+and never infers an intention to replan from file changes. Keep history under
+the chosen plan name; MB owns storage details. See ADR 0014.

@@ -1,5 +1,9 @@
 # ADR 0013: Adopt execution edits at plan
 
+Update (2026-10-08): [ADR 0014](0014-named-plans-and-explicit-confirmation.md)
+supersedes identity, saved-plan ownership, confirmation-failure and concurrency
+rules where they differ. The text below records the earlier decision.
+
 Status: accepted, 2026-10-07
 
 ## Context

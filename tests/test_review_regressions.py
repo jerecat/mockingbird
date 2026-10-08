@@ -14,12 +14,13 @@ from mockingbird.testing import check_execution_adapter, check_capacity_provider
 
 
 def definition(tmp_path, name="A"):
-    return {"name": name, "_definition_path": str(tmp_path / f"{name}.yaml"),
-            "_invocation_dir": str(tmp_path), "workspace": str(tmp_path / "work"),
-            "run_root": str(tmp_path / "runs"),
-            "scheduler": {"capacity_provider": "fixed", "poll_interval_s": .01},
-            "execution": {"command": [sys.executable, "-c", "pass"],
-                          "args": [], "timeout_s": 2, "jobs": ["a", "b"]}}
+    return {
+        'plan': name,
+        '_definition_path': str(tmp_path / f'{name}.yaml'),
+        '_invocation_dir': str(tmp_path),
+        'scheduler': {'capacity_provider': 'fixed', 'poll_interval_s': 0.01},
+        'execution': {'command': [sys.executable, '-c', 'pass'], 'args': [], 'timeout_s': 2, 'jobs': ['a', 'b']},
+    }
 
 
 def ready(d):
@@ -30,17 +31,16 @@ def ready(d):
 
 def test_wrong_definition_rejected_before_dispatch(tmp_path):
     ready(definition(tmp_path))
-    with pytest.raises(RuntimeError, match="different definition"):
+    with pytest.raises(RuntimeError, match="context not prepared"):
         lifecycle.run(definition(tmp_path, "B"))
-    assert not list((tmp_path / "runs").iterdir())
+    assert not list((tmp_path / "work/A/runs").iterdir())
 
 
 def test_same_definition_edits_require_plan_without_prepare(tmp_path):
     d = definition(tmp_path)
     ready(d)
     d["execution"]["jobs"] = ["new"]
-    with pytest.raises(RuntimeError, match="execution settings changed"):
-        lifecycle.plan_jobs(d)
+    assert [j.id for j in lifecycle.plan_jobs(d)] == ["a", "b"]
     lifecycle.create_plan(d)
     assert [j.id for j in lifecycle.plan_jobs(d)] == ["new"]
 
@@ -49,9 +49,9 @@ def test_collect_checks_run_definition_but_does_not_need_current_prepared_worksp
     d = definition(tmp_path)
     ready(d)
     _, rd, _ = lifecycle.run(d)
-    with pytest.raises(RuntimeError, match="different definition"):
+    with pytest.raises(ValueError, match="different plan"):
         lifecycle.collect(definition(tmp_path, "B"), rd)
-    write_json(tmp_path / "work/.reg/preparing.json", {"started_at": "interrupted"})
+    write_json(tmp_path / "work/A/.reg/preparing.json", {"started_at": "interrupted"})
     assert lifecycle.collect(d, rd)[0]["collection_complete"]
 
 
@@ -73,7 +73,7 @@ def test_partial_prepare_invalidates_previous_plan_and_can_recover(tmp_path, mon
     provider.fail = True
     with pytest.raises(OSError):
         context.prepare(d)
-    assert read_json(tmp_path / "work/sources/one/version.json") == "new"
+    assert read_json(tmp_path / "work/A/sources/one/version.json") == "new"
     for operation in (lifecycle.setup, lifecycle.create_plan, lifecycle.run):
         with pytest.raises(RuntimeError, match="prepare is incomplete"):
             operation(d)
@@ -215,15 +215,15 @@ def test_adapter_receives_same_contract_in_runtime_and_conformance(tmp_path, mon
 def test_prepared_context_cannot_bypass_runtime_poll_validation(tmp_path, value):
     d = definition(tmp_path)
     ready(d)
-    path = tmp_path / "work/.reg/context.json"
+    path = tmp_path / "work/A/.reg/plan.json"
     data = read_json(path)
-    data["scheduler"]["poll_interval_s"] = value
+    data["context"]["scheduler"]["poll_interval_s"] = value
     # Simulate a context saved by an older, permissive implementation.
     import json
     path.write_text(json.dumps(data))
     with pytest.raises(ValueError, match="finite positive"):
         lifecycle.run(d)
-    assert not list((tmp_path / "runs").iterdir())
+    assert not list((tmp_path / "work/A/runs").iterdir())
 
 
 @pytest.mark.parametrize("value", [True, "1", 1.5, -1])

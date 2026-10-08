@@ -22,18 +22,28 @@ def test_sigint_drains_current_job_and_preserves_partial_collection(tmp_path):
     marker = tmp_path / "current-job-started"
     definition = tmp_path / "regression.yaml"
     definition.write_text(yaml.safe_dump({
-        "execution": {
-            "defaults": {"command": [sys.executable, "-c", "pass"],
-                         "args": [], "timeout_s": 5},
-            "jobs": ["first", {
-                "id": "current",
-                "command": [sys.executable, "-c",
-                            "from pathlib import Path; import time; "
-                            f"Path({str(marker)!r}).touch(); time.sleep(1)"],
-            }, "not-started"],
+        'plan': 'test',
+        'execution': {
+            'defaults': {'command': [sys.executable, '-c', 'pass'], 'args': [], 'timeout_s': 5},
+            'jobs': [
+                'first',
+                {
+                    'id': 'current',
+                    'command': [
+                        sys.executable,
+                        '-c',
+                        f'from pathlib import Path; import time; Path({str(marker)!r}).touch(); time.sleep(1)',
+                    ],
+                },
+                'not-started',
+            ],
         },
-        "scheduler": {"capacity_provider": "fixed", "max_parallel": 1,
-                      "poll_interval_s": 0.01, "config": {"slots": 1}},
+        'scheduler': {
+            'capacity_provider': 'fixed',
+            'max_parallel': 1,
+            'poll_interval_s': 0.01,
+            'config': {'slots': 1},
+        },
     }))
     env = dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -43,11 +53,11 @@ def test_sigint_drains_current_job_and_preserves_partial_collection(tmp_path):
                               text=True, timeout=10)
 
     for cycle in ("prepare", "setup", "plan"):
-        completed = cli(cycle, str(definition))
+        completed = cli(cycle, "test" if cycle == "setup" else str(definition))
         assert completed.returncode == 0, completed.stderr
 
     process = subprocess.Popen(
-        [sys.executable, "-m", "mockingbird.cli", "run", str(definition)],
+        [sys.executable, "-m", "mockingbird.cli", "run", "test"],
         cwd=tmp_path, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         text=True,
     )
@@ -66,13 +76,13 @@ def test_sigint_drains_current_job_and_preserves_partial_collection(tmp_path):
             process.kill()
             process.communicate(timeout=10)
 
-    run = Path(read(tmp_path / "work/.reg/last_run.json")["run_dir"])
+    run = Path(read(tmp_path / "work/test/.reg/last_run.json")["run_dir"])
     assert read(run / "run.json")["status"] == "INTERRUPTED"
     evidence = (run / "executions.json").read_bytes()
     assert [e["job_id"] for e in json.loads(evidence)] == ["first", "current"]
     assert all(e["observation"]["returncode"] == 0 for e in json.loads(evidence))
 
-    collected = cli("collect", str(definition), "--run-dir", str(run))
+    collected = cli("collect", "test", "--run-dir", str(run))
     assert collected.returncode == 2, collected.stderr
     result = read(run / "result.json")
     assert result["status"] == "PENDING"
@@ -81,7 +91,7 @@ def test_sigint_drains_current_job_and_preserves_partial_collection(tmp_path):
     assert result["summary"]["uncollected"] == 1
     assert "not-started" not in {t["id"] for t in result["tests"]}
     assert read(run / "run.json")["status"] == "INTERRUPTED"
-    again = cli("collect", str(definition), "--run-dir", str(run))
+    again = cli("collect", "test", "--run-dir", str(run))
     assert again.returncode == 2
     assert read(run / "result.json")["collection"] == result["collection"]
     assert (run / "executions.json").read_bytes() == evidence
@@ -91,10 +101,9 @@ def test_interrupt_before_first_dispatch_is_collectable(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     definition = tmp_path / "regression.yaml"
     definition.write_text(yaml.safe_dump({
-        "execution": {"command": [sys.executable, "-c", "pass"],
-                      "timeout_s": 1, "jobs": ["never-started"]},
-        "scheduler": {"capacity_provider": "fixed", "max_parallel": 1,
-                      "config": {"slots": 1}},
+        'plan': 'test',
+        'execution': {'command': [sys.executable, '-c', 'pass'], 'timeout_s': 1, 'jobs': ['never-started']},
+        'scheduler': {'capacity_provider': 'fixed', 'max_parallel': 1, 'config': {'slots': 1}},
     }))
     defn = load_definition(definition)
     prepare(defn)
@@ -108,7 +117,7 @@ def test_interrupt_before_first_dispatch_is_collectable(tmp_path, monkeypatch):
     monkeypatch.setattr(lifecycle, "load_capacity_provider", lambda *_: InterruptedCapacity())
     with pytest.raises(KeyboardInterrupt):
         lifecycle.run(defn)
-    run = Path(read(tmp_path / "work/.reg/last_run.json")["run_dir"])
+    run = Path(read(tmp_path / "work/test/.reg/last_run.json")["run_dir"])
     assert read(run / "run.json")["status"] == "INTERRUPTED"
     assert read(run / "executions.json") == []
     result, _ = lifecycle.collect(defn, run)

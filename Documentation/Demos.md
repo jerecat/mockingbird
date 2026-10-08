@@ -23,11 +23,11 @@ Run from the repository root with the installed virtual environment active:
 
 ```bash
 mb prepare examples/sample-collector.yaml
-mb setup examples/sample-collector.yaml
+mb setup sample-collector
 mb plan examples/sample-collector.yaml
-mb run examples/sample-collector.yaml
-mb collect examples/sample-collector.yaml
-mb status examples/sample-collector.yaml
+mb run sample-collector
+mb collect sample-collector
+mb status sample-collector
 ```
 
 First collect: total=8, pass=2, fail=1, error=1, skip=1, pending=1,
@@ -57,8 +57,8 @@ cat "work/sample-results/$RUN_ID/test_fail/result.txt"
 # Simulate the external system completing and its result service recovering.
 # This touches only project-owned sample files, never Mockingbird's records.
 python3 examples/sample_finish.py "$RUN_ID"
-mb collect examples/sample-collector.yaml --run-dir "runs/sample-collector/$RUN_ID"
-mb status examples/sample-collector.yaml --run-dir "runs/sample-collector/$RUN_ID"
+mb collect sample-collector --run-dir "work/sample-collector/runs/$RUN_ID"
+mb status sample-collector --run-dir "work/sample-collector/runs/$RUN_ID"
 ```
 
 Second collect: total=8, pass=5, fail=1, error=1, skip=1; all unresolved counts
@@ -116,8 +116,8 @@ canonical result flow on an ordinary Linux machine.
 
 ```bash
 mockingbird all examples/regression-fail-demo.yaml || true
-mockingbird run examples/regression-fail-demo.yaml --failed-from runs/<chosen-run>
-mockingbird collect examples/regression-fail-demo.yaml
+mockingbird run linux-command-fail-demo --failed-from work/linux-command-fail-demo/runs/<chosen-run>
+mockingbird collect linux-command-fail-demo
 ```
 
 Purpose: demonstrate explicit FAIL provenance and Job-granularity rerun.

@@ -30,10 +30,10 @@ A returning submit command does not mean its external work has finished.
 ## Inspect from another terminal
 
 ```sh
-mb status examples/sample-collector.yaml
-mb status examples/sample-collector.yaml --run-dir runs/sample-collector/<run-id>
-mb status examples/sample-collector.yaml --json
-mb status examples/sample-collector.yaml --details
+mb status sample-collector
+mb status sample-collector --run-dir work/sample-collector/runs/<run-id>
+mb status sample-collector --json
+mb status sample-collector --details
 ```
 
 Without `--run-dir`, status selects the workspace's latest run, published before
@@ -83,3 +83,11 @@ a long-running command can legitimately have an old transition timestamp.
 Reads during an active run or sweep can span adjacent transitions. Status is a
 read-only observation, not an atomic snapshot across all files. It neither
 repairs records nor changes execution or final results.
+
+## Plan history and contents
+
+Use `mb status sample-collector --history` for all runs and recorded results.
+Select one with `--run <run-id>`. Add `--plan` to inspect its exact saved plan,
+or use `--plan` alone for the current confirmed contents. All views work without
+the original YAML. Without a selector, status/collect use the latest-started run;
+completion or collection of an older run never changes that default.

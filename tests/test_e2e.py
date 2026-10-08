@@ -11,9 +11,7 @@ from mockingbird.selection import Selection
 def _write_definition(path: Path):
     path.write_text(
         """
-name: e2e
-workspace: ./work
-run_root: ./runs
+plan: e2e
 sources: []
 execution:
   adapter: demo_linux
@@ -47,12 +45,12 @@ def test_context_plan_run_result_and_failed_rerun(monkeypatch, tmp_path: Path):
     executions, first_run, _ = lifecycle.run(defn)
     result, _ = lifecycle.collect(defn, first_run)
 
-    assert Path(context["paths"]["workspace"]) == tmp_path / "work"
+    assert Path(context["paths"]["workspace"]) == tmp_path / "work/e2e"
     assert [item["id"] for item in plan["jobs"]] == ["passing", "failing", "another"]
     assert len(executions) == 3
     assert result["summary"] == {"total": 3, "pass": 2, "fail": 1, "error": 0, "skip": 0, "pending": 0, "uncollected": 0, "collection_error": 0}
 
-    for evidence in ("context.json", "plan.json", "run.json", "executions.json", "result.json"):
+    for evidence in ("plan.json", "run.json", "executions.json", "result.json"):
         assert (first_run / evidence).is_file()
 
     previous_result = first_run / "result.json"

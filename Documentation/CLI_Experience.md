@@ -2,7 +2,7 @@
 
 Normal output is intended for people. Saved context and result files remain the
 machine contracts; `prepare` no longer dumps the entire context to the terminal.
-It reports the prepared set, workspace, source count/materialization, and next
+It reports the prepared plan, storage path, source count/materialization, and next
 command. Full context is still saved in `<workspace>/.reg/context.json`.
 
 For the interactive first-run walkthrough, use `mb tutorial` after installing
@@ -16,10 +16,10 @@ collector faults; a completed tutorial still exits zero.
 ```sh
 mb prepare examples/sample-collector.yaml
 mb plan examples/sample-collector.yaml
-mb dry-run examples/sample-collector.yaml
-mb run examples/sample-collector.yaml
-mb status examples/sample-collector.yaml
-mb collect examples/sample-collector.yaml
+mb dry-run sample-collector
+mb run sample-collector
+mb status sample-collector
+mb collect sample-collector
 ```
 
 `mb all <definition>` performs prepare, setup, plan, run, and collect, printing
@@ -31,12 +31,13 @@ For example, running before preparation reports on stderr:
 ```text
 Error: context not prepared
 Required steps:
-  mb prepare examples/sample-collector.yaml
-  mb plan examples/sample-collector.yaml
+  mb prepare '<definition.yaml>'
+  mb plan '<definition.yaml>'
 Then retry your command.
 ```
 
-Recovery commands include shell-quoted paths. Missing or stale setup/plan also
+Before the first prepare, supply your YAML path in place of `<definition.yaml>`.
+After prepare, recovery commands use the recorded, shell-quoted YAML path. Missing or stale setup/plan also
 produce actionable instructions. Normal errors do not print a Python traceback.
 Use `mb --debug <command> <definition>` (or put `--debug` after the command) to
 obtain one when investigating a failure. Parser usage errors still show help.
@@ -59,14 +60,15 @@ obtain one when investigating a failure. Parser usage errors still show help.
 stdout. Redirect stdout to a file to consume it. Diagnostics go to stderr.
 `collect --json` returns the full result, not just its `summary` member.
 Scripts that previously parsed the default prepare/collect/all output should
-use explicit JSON options or saved files. Saved plan.json now includes the normalized execution input alongside resolved
-Jobs. Each run saves that execution configuration in its own context.json.
-Older plans without this field compare against their prepared execution config.
+use explicit JSON options or saved files. Schema-3 plan.json embeds the original
+input, resolved Jobs and complete execution context. Each run saves that plan.
+No original YAML is needed to inspect or collect the run. Use `status --history`
+to list runs and `status --run <run-id> --plan` to inspect historical contents.
 
 ```sh
 mb prepare examples/sample-collector.yaml --json > context-copy.json
-mb collect examples/sample-collector.yaml --json > collected-result.json
-mb status examples/sample-collector.yaml --details
+mb collect sample-collector --json > collected-result.json
+mb status sample-collector --details
 ```
 
 Status separates JOB, EXECUTION, COLLECTION, and RESULT into aligned columns.
@@ -117,11 +119,10 @@ With no setup list, the standard command adapter permits prepare directly follow
 
 ## Edit execution and replan
 
-For the standard command adapter, execution YAML edits need only plan, then run.
-An interactive run with changed execution asks "Update the plan and run? [Y/n]".
-Enter/Y creates and validates a new plan; n/EOF cancels. Non-terminal stdin stops
-with a plan prerequisite error. Preparation changes are never auto-applied.
-Custom adapter config changes still require prepare/setup.
+Confirm execution/scheduler edits with `mb plan YAML`. Setup/run/dry-run/status/
+collect take the plan name. Run does not reread YAML or offer to update it.
+Failed confirmation leaves the previous plan intact. Sources/setup changes still
+require explicit preparation; see [Named plans](Named_Plans.md).
 
 Launch errors print the reason and execution.json/stderr.log paths immediately.
 Nonzero exit codes and timeouts also print these paths. This reports execution

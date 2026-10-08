@@ -30,6 +30,21 @@ def read_json(path: Path) -> Any:
 
 
 @contextmanager
+def file_lock(path: Path, *, shared=False, blocking=False, message="operation is already running"):
+    """Lock an existing plan directory; process exit releases the lock."""
+    with path.open("a") as stream:
+        mode = fcntl.LOCK_SH if shared else fcntl.LOCK_EX
+        try:
+            fcntl.flock(stream, mode | (0 if blocking else fcntl.LOCK_NB))
+        except BlockingIOError:
+            raise RuntimeError(message) from None
+        try:
+            yield
+        finally:
+            fcntl.flock(stream, fcntl.LOCK_UN)
+
+
+@contextmanager
 def collection_lock(run_path: Path):
     """A second collect must not repeat work while the first owns this run."""
     with (run_path / ".collect.lock").open("a") as stream:

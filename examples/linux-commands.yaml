@@ -1,6 +1,4 @@
-name: linux-commands
-workspace: ./work/linux-commands
-run_root: ./runs/linux-commands
+plan: linux-commands
 sources: []
 
 # Run ordinary Linux commands directly, one Job at a time.

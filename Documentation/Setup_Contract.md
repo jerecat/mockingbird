@@ -1,5 +1,6 @@
 # Setup command contract and retry workflow
 
+In the examples below, regression.yaml contains `plan: smoke`.
 A project can supply three external contracts:
 
 | Phase | Contract | Success means |
@@ -53,10 +54,10 @@ list. Their hooks should raise on failure and remain synchronous.
 
 ```sh
 mb prepare regression.yaml
-mb setup regression.yaml
+mb setup smoke
 mb plan regression.yaml
-mb run regression.yaml
-mb collect regression.yaml
+mb run smoke
+mb collect smoke
 ```
 
 For the built-in command adapter, omitted setup (or an empty list) means no setup
@@ -64,7 +65,8 @@ is required: use `prepare -> plan -> run -> collect`. Explicit `mb setup` report
 that no setup is needed. Recovery instructions skip it. Existing custom adapters
 still require setup; their interfaces have not changed.
 
-Starting an actual setup attempt invalidates earlier setup success and removes
+Setup takes a plan name and uses the commands saved by prepare. Editing YAML
+alone does not change those commands. Starting an actual setup attempt invalidates earlier setup success and removes
 the old plan **before** running any command or hook. Until that attempt succeeds,
 plan and run are blocked. After success, create a new plan before running.
 Re-running setup is always explicit; plan/run do not automatically execute it.
@@ -76,7 +78,7 @@ If a setup command fails:
 
 1. Read the reported Job and log directory.
 2. Edit the project script or source to fix it.
-3. Run `mb setup regression.yaml` again. The full setup list starts at the first
+3. Run `mb setup smoke` again. The full setup list starts at the first
    Job; there is no automatic resume, rollback, source reset, or cleanup.
 4. After success, run plan and run.
 
@@ -118,7 +120,7 @@ From the Mockingbird clone, after installing it:
 ```sh
 mb prepare examples/setup-commands.yaml
 touch work/setup-demo/force-setup-failure
-mb setup examples/setup-commands.yaml
+mb setup setup-demo
 ```
 
 The second setup Job deliberately exits 7. MB reports failure and the saved logs.
@@ -129,10 +131,10 @@ Remove only the sample failure marker, then retry:
 
 ```sh
 rm work/setup-demo/force-setup-failure
-mb setup examples/setup-commands.yaml
+mb setup setup-demo
 mb plan examples/setup-commands.yaml
-mb run examples/setup-commands.yaml
-mb collect examples/setup-commands.yaml
+mb run setup-demo
+mb collect setup-demo
 ```
 
 In a real project, this step could instead be an editor fix to the script or source.

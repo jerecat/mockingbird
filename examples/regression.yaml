@@ -1,8 +1,6 @@
-name: linux-command-demo
+plan: linux-command-demo
 
 # Relative paths are intentionally resolved from the directory where `mockingbird` is invoked.
-workspace: ./work
-run_root: ./runs
 
 # Any number of sources may be listed. The demo itself needs none.
 sources: []

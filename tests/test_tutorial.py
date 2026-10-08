@@ -35,7 +35,7 @@ def test_tutorial_complete_and_cleanup_is_only_guidance(tmp_path, automatic, adv
     assert shlex.join(["rm", "-rf", "--", str(target)]) in result.stdout
     assert target.is_dir() and (target / "GUIDE.md").is_file()
     assert not (tmp_path / "work").exists() and not (tmp_path / "runs").exists()
-    run, = (target / "runs/sample-collector").iterdir()
+    run, = (target / "work/sample-collector/runs").iterdir()
     summary = json.loads((run / "result.json").read_text())["summary"]
     expected = {"total": 8, "pass": 5, "fail": 1, "error": 1, "skip": 1,
                        "pending": 0, "uncollected": 0, "collection_error": 0}

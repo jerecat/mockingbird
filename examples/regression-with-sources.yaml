@@ -1,6 +1,4 @@
-name: mixed-source-example
-workspace: ./work
-run_root: ./runs
+plan: mixed-source-example
 
 # Illustrative only: replace URLs/revisions with real project locations.
 # Source count is unbounded and providers may be mixed in one context.

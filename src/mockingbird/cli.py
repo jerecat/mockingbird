@@ -11,11 +11,13 @@ import yaml
 from pathlib import Path
 
 from . import lifecycle
-from .context import load_definition, prepare
-from .errors import PrerequisiteError, PlanChangedError
+from .context import load_definition, prepare, plan_target, metadata_path, run_root_path
+from .errors import PrerequisiteError
 from .doctor import doctor_failed, run_doctor
 from .selection import Selection, write_selection_file
-from .status import snapshot
+from .status import snapshot, history, plan_details
+from .io import read_json
+from .models import Job
 from .setup_contract import setup_required
 
 
@@ -41,7 +43,7 @@ def _selection(args) -> Selection:
 def _print_checklist(context: dict, selected, selection_meta: dict) -> None:
     scheduler = context["scheduler"]
     print("Run checklist")
-    print(f"  [OK] context: {context['name']} @ {context['prepared_at']}")
+    print(f"  [OK] context: {context['plan']} @ {context['prepared_at']}")
     print(f"  [OK] workspace: {context['paths']['workspace']}")
     print(f"  [OK] sources: {len(context['sources'])}")
     for source in context["sources"]:
@@ -77,18 +79,9 @@ def _confirm() -> bool:
 
 
 
-def _confirm_plan_update():
-    print("Execution settings changed since plan.")
-    while True:
-        try:
-            answer = input("Update the plan and run? [Y/n] ").strip().lower()
-        except EOFError:
-            return False
-        if answer in {"", "y", "yes"}:
-            return True
-        if answer in {"n", "no"}:
-            return False
-        print("Enter Y to update and run, or n to cancel.")
+def _confirm_run(context, selected, selection_meta):
+    _print_checklist(context, selected, selection_meta)
+    return _confirm()
 
 
 def _summary(result: dict) -> str:
@@ -115,26 +108,33 @@ def build_parser() -> argparse.ArgumentParser:
     }
     for name, description in descriptions.items():
         cmd = sub.add_parser(name, help=description, description=description)
-        cmd.add_argument("definition")
+        cmd.add_argument("definition", metavar="PLAN" if name in {"setup", "collect", "status"} else "YAML")
 
     plan = sub.add_parser("plan", help="validate and save the Job list")
-    plan.add_argument("definition")
+    plan.add_argument("definition", metavar="YAML")
     plan.add_argument("--write-selection", metavar="PATH")
 
     dry = sub.add_parser("dry-run", help="preview the planned selection without executing")
-    dry.add_argument("definition")
+    dry.add_argument("definition", metavar="PLAN")
     _add_selection_args(dry)
 
     run = sub.add_parser("run", help="execute the prepared plan; does not collect results")
-    run.add_argument("definition")
+    run.add_argument("definition", metavar="PLAN")
     _add_selection_args(run)
     run.add_argument("--interactive", action="store_true", help="show checklist and ask before run")
 
     collect = sub.choices["collect"]
-    collect.add_argument("--run-dir")
+    collect_run = collect.add_mutually_exclusive_group()
+    collect_run.add_argument("--run-dir", help="explicit run directory (including old runs)")
+    collect_run.add_argument("--run", help="run ID within this plan")
 
     status = sub.choices["status"]
-    status.add_argument("--run-dir")
+    status_run = status.add_mutually_exclusive_group()
+    status_run.add_argument("--run-dir", help="explicit run directory (including old runs)")
+    status_run.add_argument("--run", help="run ID within this plan")
+    status_view = status.add_mutually_exclusive_group()
+    status_view.add_argument("--history", action="store_true", help="list this plan's runs and results")
+    status_view.add_argument("--plan", action="store_true", help="show the confirmed plan, or the plan saved in --run")
     status.add_argument("--json", action="store_true", help="print the saved-state snapshot as JSON")
 
     all_cmd = sub.choices["all"]
@@ -164,6 +164,31 @@ def _command(command, definition, run_dir=None):
 
 def _next(command, definition, run_dir=None):
     print(f"Next: {_command(command, definition, run_dir)}")
+
+
+def _definition_for(defn):
+    path = metadata_path(defn) / "context.json"
+    if path.is_file():
+        return read_json(path).get("definition_path", "<definition.yaml>")
+    return "<definition.yaml>"
+
+
+def _history(defn, as_json=False):
+    data = history(defn)
+    if as_json:
+        print(json.dumps(data, indent=2))
+        return
+    print(f"Plan: {data['plan']}")
+    if not data['runs']:
+        print("No runs yet.")
+        return
+    rows = [("RUN", "EXECUTION", "RESULT", "JOBS")]
+    rows += [(r['run_id'], r['execution'], r['result'] or "UNCOLLECTED", str(r['jobs'])) for r in data['runs']]
+    widths = [max(len(row[i]) for row in rows) for i in range(4)]
+    for row in rows:
+        print("  ".join(v.ljust(w) for v, w in zip(row, widths)).rstrip())
+    print(f"Inspect: mb status {defn['plan']} --run <run-id>")
+    print(f"Saved plan: mb status {defn['plan']} --run <run-id> --plan")
 
 
 def _time(value):
@@ -207,7 +232,7 @@ def _status(defn: dict, run_dir: str | None, as_json=False, details=False) -> No
     print("Command completion does not imply external completion.")
     print(f"run: {data['run_dir']}")
     if data['execution_status'] != "RUNNING" and data['final'] < data['recorded']:
-        _next("collect", defn['_definition_path'], data['run_dir'])
+        _next("collect", defn['plan'], data['run_dir'])
     if data['recorded'] < data['total'] and data['execution_status'] != "RUNNING":
         print("Jobs without execution records cannot be collected; run starts a new run.")
 
@@ -305,7 +330,14 @@ def _dispatch(args, parser) -> None:
         from .tutorial import run_tutorial
         run_tutorial(args.directory, args.yes, args.advanced)
         return
-    defn = load_definition(args.definition)
+    named = args.command in {"setup", "run", "dry-run", "collect", "status"}
+    defn = plan_target(args.definition) if named else load_definition(args.definition)
+    args.plan_name = defn.get("plan")
+    if getattr(args, "run", None):
+        run_id = args.run
+        if Path(run_id).name != run_id or run_id in {".", ".."} or "\\" in run_id:
+            raise ValueError("--run must be a run ID, not a path; use --run-dir for a path")
+        args.run_dir = str(run_root_path(defn) / run_id)
 
     if args.command == "doctor":
         checks = run_doctor(defn)
@@ -322,12 +354,12 @@ def _dispatch(args, parser) -> None:
         else:
             print("Preparing workspace...", flush=True)
             context = prepare(defn)
-            print(f"Prepared: {context['name']}")
+            print(f"Prepared: {context['plan']}")
             print(f"Workspace: {context['paths']['workspace']}")
             print(f"Sources: {len(context['sources'])}")
             for source in context['sources']:
                 print(f"  {source['name']}: {source.get('materialization', 'prepared')}")
-            _next("setup" if setup_required(context) else "plan", args.definition)
+            _next("setup" if setup_required(context) else "plan", defn["plan"] if setup_required(context) else args.definition)
         return
 
     if args.command == "setup":
@@ -337,20 +369,21 @@ def _dispatch(args, parser) -> None:
             print(f"Setup complete. Records: {attempt}")
         else:
             print("Setup not required: no setup commands configured.")
-        _next("plan", args.definition)
+        _next("plan", _definition_for(defn))
         return
 
     if args.command == "plan":
         print("Validating plan...", flush=True)
         plan = lifecycle.create_plan(defn)
-        print(f"plan: {len(plan['jobs'])} jobs")
+        args.plan_confirmed = True
+        print(f"Confirmed: {defn['plan']} ({len(plan['jobs'])} jobs)")
         for job in plan["jobs"]:
             print(f"  - {job['id']}")
         if args.write_selection:
-            jobs = lifecycle.plan_jobs(defn)
+            jobs = [Job(**item) for item in plan["jobs"]]
             write_selection_file(args.write_selection, jobs)
             print(f"selection file: {Path(args.write_selection).resolve()}")
-        _next("run", args.definition)
+        _next("run", defn["plan"])
         return
 
     if args.command == "dry-run":
@@ -360,24 +393,14 @@ def _dispatch(args, parser) -> None:
 
     if args.command == "run":
         selection = _selection(args)
-        try:
-            context, selected, meta = lifecycle.preview(defn, selection)
-        except PlanChangedError:
-            if not sys.stdin.isatty():
-                raise
-            if not _confirm_plan_update():
-                print("run: cancelled; no Jobs started")
-                return
-            lifecycle.create_plan(defn)
-            context, selected, meta = lifecycle.preview(defn, selection)
-        if args.interactive:
-            _print_checklist(context, selected, meta)
-            if not _confirm():
-                print("run: cancelled")
-                return
-        executions, run_dir, _ = lifecycle.run(defn, selection, on_progress=_progress)
+        outcome = lifecycle.run(defn, selection, on_progress=_progress,
+                                confirm=_confirm_run if args.interactive else None)
+        if outcome is None:
+            print("run: cancelled; no Jobs started")
+            return
+        executions, run_dir, _ = outcome
         _execution_summary(executions, run_dir)
-        _next("collect", args.definition, run_dir)
+        _next("collect", defn["plan"], run_dir)
         return
 
     if args.command == "collect":
@@ -388,13 +411,21 @@ def _dispatch(args, parser) -> None:
         else:
             print("Collection started", flush=True)
             result, run_dir = lifecycle.collect(defn, args.run_dir)
-            _collection_summary(result, run_dir, args.definition)
+            _collection_summary(result, run_dir, defn["plan"])
         if result["status"] != "PASS":
             raise SystemExit(2 if result["status"] == "PENDING" else 1)
         return
 
     if args.command == "status":
-        _status(defn, args.run_dir, args.json, args.details)
+        if args.history:
+            if args.run_dir:
+                raise ValueError("--history lists all runs; use --run or --run-dir without --history")
+            _history(defn, args.json)
+        elif args.plan:
+            data = plan_details(defn, args.run_dir)
+            print(json.dumps(data, indent=2))
+        else:
+            _status(defn, args.run_dir, args.json, args.details)
         return
 
     if args.command == "all":
@@ -406,17 +437,16 @@ def _dispatch(args, parser) -> None:
         print("Validating plan...", flush=True)
         lifecycle.create_plan(defn)
         selection = _selection(args)
-        context, selected, meta = lifecycle.preview(defn, selection)
-        if args.interactive:
-            _print_checklist(context, selected, meta)
-            if not _confirm():
-                print("run: cancelled")
-                return
-        executions, run_dir, _ = lifecycle.run(defn, selection, on_progress=_progress)
+        outcome = lifecycle.run(defn, selection, on_progress=_progress,
+                                confirm=_confirm_run if args.interactive else None)
+        if outcome is None:
+            print("run: cancelled; no Jobs started")
+            return
+        executions, run_dir, _ = outcome
         _execution_summary(executions, run_dir)
         print("Collection started", flush=True)
         result, _ = lifecycle.collect(defn, run_dir)
-        _collection_summary(result, run_dir, args.definition)
+        _collection_summary(result, run_dir, defn["plan"])
         if result["status"] != "PASS":
             raise SystemExit(2 if result["status"] == "PENDING" else 1)
         return
@@ -447,7 +477,7 @@ def main() -> None:
         print("Interrupted.", file=sys.stderr)
         if args.command in {"run", "collect", "all"}:
             print("Inspect saved state before retrying (if a run was created):", file=sys.stderr)
-            print(f"  {_command('status', args.definition, getattr(args, 'run_dir', None))}", file=sys.stderr)
+            print(f"  {_command('status', getattr(args, 'plan_name', None) or args.definition, getattr(args, 'run_dir', None))}", file=sys.stderr)
         else:
             print("The operation did not complete; retry it when ready.", file=sys.stderr)
         raise SystemExit(130) from None
@@ -461,9 +491,18 @@ def main() -> None:
             for step in exc.steps:
                 if step == args.command:
                     break
-                print(f"  {_command(step, args.definition)}", file=sys.stderr)
+                target = (getattr(args, "plan_name", None) or args.definition) if step in {"setup", "run"} else (
+                    args.definition if args.command in {"prepare", "plan", "all", "doctor"} else
+                    _definition_for(plan_target(args.definition)))
+                print(f"  {_command(step, target)}", file=sys.stderr)
             print("Then retry your command.", file=sys.stderr)
-        elif not isinstance(exc, (ValueError, OSError, yaml.YAMLError)):
+        if args.command == "plan":
+            if getattr(args, "plan_confirmed", False):
+                print("Plan was confirmed, but follow-up output failed; inspect it with "
+                      f"mb status {args.plan_name} --plan.", file=sys.stderr)
+            else:
+                print("Plan confirmation failed; the last successfully confirmed plan was not replaced.", file=sys.stderr)
+        if not isinstance(exc, (PrerequisiteError, ValueError, OSError, yaml.YAMLError)):
             print("Use --debug for a traceback.", file=sys.stderr)
         raise SystemExit(1) from None
 

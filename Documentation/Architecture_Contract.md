@@ -77,7 +77,7 @@ remain outside core.
 ```text
 regression.yaml   human intent
 context.json      resolved/frozen context
-plan.json         discovered canonical plan
+plan.json         confirmed context, input and resolved Jobs
 run.json          selected/executed run evidence
 result.json       canonical result evidence
 ```
@@ -229,3 +229,10 @@ not final test judgements. Each outcome is checkpointed independently. A run is
 not reported as PASS while any selected Job remains unresolved.
 
 See ADR 0008 and Execution_Contract.md for the schema and external protocol.
+
+## AC-19: Explicit confirmation owns execution intent
+
+A named plan changes only after successful explicit confirmation. Run uses the
+saved plan and retains it with its execution evidence. Live YAML edits do not
+change execution. Each result can be traced to the plan used by its own run.
+See ADR 0014.

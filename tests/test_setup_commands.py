@@ -14,9 +14,11 @@ from mockingbird.doctor import run_doctor, doctor_failed
 
 def definition(tmp_path, monkeypatch, jobs=None):
     monkeypatch.chdir(tmp_path)
-    data = {"execution": {"command": [sys.executable, "-c", "pass"], "args": [],
-                          "timeout_s": 2, "jobs": ["test"]},
-            "scheduler": {"capacity_provider": "fixed"}}
+    data = {
+        'plan': 'test',
+        'execution': {'command': [sys.executable, '-c', 'pass'], 'args': [], 'timeout_s': 2, 'jobs': ['test']},
+        'scheduler': {'capacity_provider': 'fixed'},
+    }
     if jobs is not None:
         data["setup"] = {"defaults": {"timeout_s": 2, "args": []}, "jobs": jobs}
     path = tmp_path / "regression.yaml"
@@ -111,7 +113,7 @@ def test_yaml_is_frozen_but_script_edits_are_not(tmp_path, monkeypatch):
     data['setup']['jobs'][0]['command'][-1] = 'pass'
     Path(d['_definition_path']).write_text(yaml.safe_dump(data))
     edited = load_definition(d['_definition_path'])
-    with pytest.raises(RuntimeError, match="preparation settings changed"): lifecycle.setup(edited)
+    with pytest.raises(RuntimeError, match="exit=4"): lifecycle.setup(edited)
     prepare(edited)
     lifecycle.setup(edited)
     lifecycle.create_plan(edited)

@@ -6,7 +6,6 @@ import pytest
 from mockingbird import lifecycle, status
 from mockingbird.adapters.command import Adapter
 from mockingbird.context import prepare
-from mockingbird.errors import PlanChangedError
 from test_review_regressions import definition
 
 
@@ -25,7 +24,7 @@ def test_replanning_does_not_repeat_setup_or_execute(tmp_path, monkeypatch, empt
     if empty_setup:
         d['setup'] = {'jobs': []}
     prepare(d)
-    user_file = tmp_path / 'work' / 'user.txt'
+    user_file = tmp_path / 'work/A' / 'user.txt'
     user_file.write_text('local edits')
     with monkeypatch.context() as patch:
         patch.setattr(subprocess, 'Popen', forbidden)
@@ -35,21 +34,20 @@ def test_replanning_does_not_repeat_setup_or_execute(tmp_path, monkeypatch, empt
         second = lifecycle.create_plan(d)
     assert first['jobs'] == second['jobs']
     assert user_file.read_text() == 'local edits'
-    assert not (tmp_path / 'work' / 'exec').exists()
-    assert not list((tmp_path / 'runs').rglob('execution.json'))
+    assert not (tmp_path / 'work/A' / 'exec').exists()
+    assert not list((tmp_path / 'work/A/runs').rglob('execution.json'))
 
 
-def test_stale_plan_rejected_before_any_run_side_effect(tmp_path, monkeypatch):
+def test_run_uses_confirmed_jobs_without_replanning(tmp_path, monkeypatch):
     d = definition(tmp_path)
     prepare(d)
     lifecycle.create_plan(d)
-    before = tree(tmp_path)
-    d['execution']['args'] = ['changed']
+    d['execution']['jobs'] = ['unconfirmed']
     with monkeypatch.context() as patch:
-        patch.setattr(subprocess, 'Popen', forbidden)
-        with pytest.raises(PlanChangedError):
-            lifecycle.run(d)
-    assert tree(tmp_path) == before
+        patch.setattr(Adapter, 'plan', forbidden)
+        patch.setattr(Adapter, 'setup', forbidden)
+        executions, _, _ = lifecycle.run(d)
+    assert [e.job_id for e in executions] == ['a', 'b']
 
 
 @pytest.mark.parametrize('collected', [False, True])

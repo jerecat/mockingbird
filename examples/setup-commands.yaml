@@ -1,6 +1,4 @@
-name: setup-demo
-workspace: ./work/setup-demo
-run_root: ./runs/setup-demo
+plan: setup-demo
 sources: []
 
 setup:

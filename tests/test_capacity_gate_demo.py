@@ -22,7 +22,7 @@ def test_capacity_pause_finish_resume_and_collect(tmp_path):
     env = environment(tmp_path)
     def mb(command, *args, expected=0):
         result = subprocess.run([sys.executable, "-m", "mockingbird.cli", command,
-                                 "examples/capacity-gate.yaml", *args], cwd=tmp_path, env=env,
+                                 ("examples/capacity-gate.yaml" if command in {"prepare", "plan", "doctor", "all"} else "capacity-gate"), *args], cwd=tmp_path, env=env,
                                 capture_output=True, text=True, timeout=10)
         assert result.returncode == expected, result.stdout + result.stderr
         return result
@@ -36,7 +36,7 @@ def test_capacity_pause_finish_resume_and_collect(tmp_path):
     assert not (tmp_path / "work").exists()
     mb("prepare"); mb("plan")
     process = subprocess.Popen([sys.executable, "-m", "mockingbird.cli", "run",
-                                "examples/capacity-gate.yaml"], cwd=tmp_path, env=env,
+                                "capacity-gate"], cwd=tmp_path, env=env,
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     try:
         deadline = time.monotonic() + 8

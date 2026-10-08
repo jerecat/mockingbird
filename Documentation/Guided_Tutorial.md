@@ -96,7 +96,7 @@ The generated directories are:
 | --- | --- |
 | `examples/` | Editable copies of the YAML and mock project scripts |
 | `work/sample-collector/.reg/` | MB context, plan and state |
-| `runs/sample-collector/<run-id>/` | MB execution/collection records, result.json and logs |
+| `work/sample-collector/runs/<run-id>/` | MB execution/collection records, result.json and logs |
 | `work/sample-results/<run-id>/<job-id>/` | Project result.txt, sim.log, tarmac.log, mock wave.fsdb, collector call counts |
 
 The sample wave.fsdb is plain text, not a simulator waveform. MB's recorded
