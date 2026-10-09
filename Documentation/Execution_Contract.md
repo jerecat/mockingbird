@@ -203,6 +203,27 @@ Each collect call performs one sweep, in selected Job order:
 - COMPLETE: retain the final result without invoking its collector.
 - No execution record: leave UNCOLLECTED; do not invent a result.
 
+The same collect command is permitted while run is RUNNING for per-Job checkpoint
+runs. It reads available execution checkpoints before invoking collectors. An
+in-flight command or a Job waiting for capacity has no checkpoint yet and remains
+UNCOLLECTED; it does not invoke a collector. A checkpoint published after that
+Job was inspected is picked up by a later collect. Collection does not wait for
+run or external work, except for the collector command itself.
+
+Run and collect share the prepared-environment read lock. Execution checkpoints
+are published atomically; collectors never consume their temporary files. Run
+owns execution records and collect owns collection records/results. A second
+collect on the same run is still rejected. Final outcomes are retained during
+ordinary collect, including across run completion. Explicit `--refresh` retains
+its existing collector-reset semantics and can also be used during run.
+
+A saved RUNNING status is not a liveness guarantee. Saved checkpoints remain
+collectable after a crash or failed terminal run-record write, without changing
+run.json or claiming execution has finished. Legacy aggregate-only runs still
+require a terminal run state because they do not publish per-Job evidence.
+Result completion and exit codes depend on selected Job outcomes, not run status;
+all results can become final just before run publishes its terminal state.
+
 No executor is rerun. No resident polling loop or background monitor is added.
 all performs one execution cycle followed by one collection sweep.
 

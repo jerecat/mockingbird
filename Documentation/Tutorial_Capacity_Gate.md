@@ -43,6 +43,18 @@ execution records and sim_c waiting for capacity. The submit commands have
 finished, while the simulated external work remains ACTIVE. ACTIVE includes both
 queued and running work for capacity accounting.
 
+While terminal A is still waiting, collect from terminal B:
+
+```sh
+mb collect capacity-gate
+mb status capacity-gate --details
+```
+
+Expected: PENDING for sim_a and sim_b, UNCOLLECTED for sim_c. Collect exits with
+code 2 because results are incomplete; it does not unblock submission or wait
+for it to finish. No collector is called for sim_c yet. The same collect command
+works both during and after run.
+
 Copy the run ID shown by queue status (also visible in MB status):
 
 ```sh
@@ -114,7 +126,8 @@ During run, the capacity command uses the invocation directory saved by prepare,
 just like execution and collection commands. Doctor uses the current invocation
 directory for its preflight check. Relative workspace paths still resolve from
 the current invocation, so use the clone directory throughout this tutorial.
-Do not run concurrent MB lifecycle operations on the same workspace.
+Run, collect, and status can overlap. Do not prepare or setup the same plan
+while run or collect is active; those preparation writes are protected by a lock.
 
 ## Files, interruption, and cleanup
 
