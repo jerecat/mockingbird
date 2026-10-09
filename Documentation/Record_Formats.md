@@ -127,3 +127,12 @@ is false. Missing flags in older records do not establish whether checks ran.
 `save` warns that run-time source state is unknown and uses the preparation
 revision when available. `mb all YAML --skip-source-check` supports the same
 option, but still performs normal preparation and its source acquisition.
+
+## Exceptional collector refresh
+
+For `collect --refresh`, result.json additionally records `collection_config`
+with `refreshed_at` and a Job-ID-to-collector-settings map named `collectors`.
+Run-level collection.json becomes authoritative for refreshed runs and contains
+that mapping plus current Job checkpoints. Existing per-Job collection checkpoints
+are ignored for these runs. See [Collector repair](Collector_Refresh.md) for
+acceptance, interruption and recovery semantics.

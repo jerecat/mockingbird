@@ -17,6 +17,9 @@ This exports selected contracts, not only completed Jobs or only FAIL results.
 
 The saved run's plan and observations are authoritative. Save does not read the
 current YAML, inspect today's worktree, or invoke preparation/execution commands.
+If collector repair was accepted with `collect --refresh`, save combines the
+original execution conditions with the adopted settings in the collection journal.
+See [Collector repair](Collector_Refresh.md).
 The command adapter exports fully resolved Job commands, arguments, timeouts,
 collectors and metadata, plus the original setup, scheduler, sources and project
 metadata. Dependencies between Jobs are not inferred; a selected Job may still

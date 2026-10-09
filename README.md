@@ -455,3 +455,8 @@ is false. Missing flags in older records do not establish whether checks ran.
 `save` warns that run-time source state is unknown and uses the preparation
 revision when available. `mb all YAML --skip-source-check` supports the same
 option, but still performs normal preparation and its source acquisition.
+
+For collector debugging or bug fixes after execution, see
+[repairing a collector without rerunning execution](Documentation/Collector_Refresh.md).
+`mb collect PLAN --refresh` accepts only collect-setting changes in the latest
+confirmed plan; ordinary collection is unchanged.

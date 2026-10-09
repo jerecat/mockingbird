@@ -386,14 +386,14 @@ def _validate_results(
 
 
 def collect(
-    defn: dict[str, Any], run_dir: str | Path | None = None
+    defn: dict[str, Any], run_dir: str | Path | None = None, *, refresh=False
 ) -> tuple[dict[str, Any], Path]:
     guard = prepared_environment(defn) if metadata_path(defn).is_dir() else nullcontext()
     with guard:
-        return _collect(defn, run_dir)
+        return _collect(defn, run_dir, refresh=refresh)
 
 
-def _collect(defn, run_dir=None):
+def _collect(defn, run_dir=None, *, refresh=False):
     run_path = _resolve_run_dir(defn, run_dir)
     with collection_lock(run_path):
         # Keep progress separate from the authoritative collection checkpoints.
@@ -402,11 +402,22 @@ def _collect(defn, run_dir=None):
         record = read_json(run_path / "run.json")
         if record.get("status") not in {"EXECUTED", "COLLECTED", "ERROR", "INTERRUPTED"}:
             raise RuntimeError(f"run is not collectable; status={record.get('status')!r}: {run_path}")
+        if refresh:
+            from .collection_refresh import refresh_journal
+            journal = refresh_journal(read_json(run_path / "plan.json"), load_plan(defn), record, _now())
+            # Atomic acceptance: overrides and invalidated verdicts travel together.
+            write_json(run_path / "collection.json", journal)
+            write_json(run_path / "result.json", _collection_result(record, context, journal))
         progress = {"state": "RUNNING", "updated_at": _now()}
         write_json(run_path / "collection_progress.json", progress)
         try:
             result = _collect_locked(defn, run_path)
         except BaseException:
+            journal_path = run_path / "collection.json"
+            if journal_path.exists():
+                journal = read_json(journal_path)
+                if "collectors" in journal:
+                    write_json(run_path / "result.json", _collection_result(record, context, journal))
             progress.update(state="STOPPED", updated_at=_now())
             write_json(run_path / "collection_progress.json", progress)
             raise
@@ -445,15 +456,17 @@ def _collect_locked(defn, run_path):
         raise ValueError("execution belongs to another run")
 
     journal_path = run_path / "collection.json"
-    if not per_job and journal_path.exists():
-        journal = read_json(journal_path)
+    saved_journal = read_json(journal_path) if journal_path.exists() else {}
+    refreshed = "collectors" in saved_journal
+    if saved_journal and (not per_job or refreshed):
+        journal = saved_journal
         if journal["run_id"] != run_record["run_id"] or set(journal["jobs"]) != set(selected):
             raise ValueError("collection journal does not match the run")
     else:
         journal = {"schema_version": 2, "run_id": run_record["run_id"], "jobs": {
             job_id: {"state": "UNCOLLECTED", "attempts": 0} for job_id in selected
         }}
-    if per_job:
+    if per_job and not refreshed:
         for job_id in selected:
             path = job_dirs[job_id] / "collection.json"
             if path.exists():
@@ -467,6 +480,9 @@ def _collect_locked(defn, run_path):
         if entry["state"] == "COMPLETE" or job_id not in by_id:
             continue
         execution = by_id[job_id]
+        if refreshed:
+            execution = copy.deepcopy(execution)
+            execution.contract["payload"]["collect"] = copy.deepcopy(journal["collectors"][job_id])
         attempts = entry["attempts"] + 1
         try:
             outcomes = adapter.collect(context, [execution])
@@ -483,7 +499,9 @@ def _collect_locked(defn, run_path):
             entry = {"state": "ERROR", "reason": f"{type(exc).__name__}: {exc}"}
         entry.update(attempts=attempts, updated_at=_now())
         journal["jobs"][job_id] = entry
-        if per_job:
+        if refreshed:
+            write_json(journal_path, journal)
+        elif per_job:
             write_json(job_dirs[job_id] / "collection.json", {
                 "run_id": run_record["run_id"], "job_id": job_id, "entry": entry})
         else:
@@ -494,6 +512,15 @@ def _collect_locked(defn, run_path):
     tests = [TestResult(**journal["jobs"][job_id]["result"]) for job_id in selected
              if journal["jobs"][job_id]["state"] == "COMPLETE"]
     _validate_results([by_id[test.id] for test in tests], tests)
+    result = _collection_result(run_record, context, journal)
+    write_json(run_path / "result.json", result)
+    return result, run_path
+
+
+def _collection_result(run_record, context, journal):
+    selected = run_record["selection"]["selected_ids"]
+    tests = [TestResult(**journal["jobs"][key]["result"]) for key in selected
+             if journal["jobs"][key]["state"] == "COMPLETE"]
     counts = {status: sum(test.status == status for test in tests) for status in _CANONICAL_STATUSES}
     states = [journal["jobs"][job_id]["state"] for job_id in selected]
     complete = len(tests) == len(selected)
@@ -515,5 +542,6 @@ def _collect_locked(defn, run_path):
         },
         "jobs": journal["jobs"],
     }
-    write_json(run_path / "result.json", result)
-    return result, run_path
+    if "collectors" in journal:
+        result["collection_config"] = {"refreshed_at": journal["refreshed_at"], "collectors": journal["collectors"]}
+    return result

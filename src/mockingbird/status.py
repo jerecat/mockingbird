@@ -21,12 +21,15 @@ def snapshot(defn, run_dir=None):
     if not per_job:
         legacy_executions = {e["job_id"]: e for e in optional("executions.json") or []}
         legacy_collection = optional("collection.json").get("jobs", {})
+    journal = optional("collection.json")
+    refreshed = "collectors" in journal
     jobs = []
     for job_id in run["selection"]["selected_ids"]:
         folder = run["jobs"][job_id]["job_dir"]
         if per_job:
             execution = optional(f"{folder}/execution.json")
-            entry = optional(f"{folder}/collection.json").get("entry", {})
+            entry = (journal["jobs"].get(job_id, {}) if refreshed else
+                     optional(f"{folder}/collection.json").get("entry", {}))
         else:
             execution = legacy_executions.get(job_id, {})
             entry = legacy_collection.get(job_id, {})

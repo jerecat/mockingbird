@@ -134,6 +134,8 @@ def build_parser() -> argparse.ArgumentParser:
     save.add_argument("--test", action="append", dest="test_ids", help="Job ID from this run; repeatable")
 
     collect = sub.choices["collect"]
+    collect.add_argument("--refresh", action="store_true",
+                         help="debug/repair collectors: re-collect with confirmed collect-only changes")
     collect_run = collect.add_mutually_exclusive_group()
     collect_run.add_argument("--run-dir", help="explicit run directory (including old runs)")
     collect_run.add_argument("--run", help="run ID within this plan")
@@ -492,11 +494,11 @@ def _dispatch(args, parser) -> None:
     if args.command == "collect":
         if args.json:
             with redirect_stdout(sys.stderr):
-                result, run_dir = lifecycle.collect(defn, args.run_dir)
+                result, run_dir = lifecycle.collect(defn, args.run_dir, refresh=args.refresh)
             print(json.dumps(result, indent=2))
         else:
-            print("Collection started", flush=True)
-            result, run_dir = lifecycle.collect(defn, args.run_dir)
+            print("Checking collector refresh..." if args.refresh else "Collection started", flush=True)
+            result, run_dir = lifecycle.collect(defn, args.run_dir, refresh=args.refresh)
             _collection_summary(result, run_dir, defn["plan"])
         if result["status"] != "PASS":
             raise SystemExit(2 if result["status"] == "PENDING" else 1)

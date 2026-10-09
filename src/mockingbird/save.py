@@ -44,7 +44,13 @@ def save_plan(defn, new_name, output, *, run_dir=None, test_ids=None):
     export = getattr(adapter, 'export_jobs', None)
     if export is None:
         raise ValueError('execution adapter does not support saving resolved Jobs')
-    execution = export(copy.deepcopy(jobs))
+    jobs = copy.deepcopy(jobs)
+    journal_path = run_path / 'collection.json'
+    journal = read_json(journal_path) if journal_path.exists() else {}
+    if 'collectors' in journal:
+        for job in jobs:
+            job['payload']['collect'] = copy.deepcopy(journal['collectors'][job['id']])
+    execution = export(jobs)
     definition = copy.deepcopy(plan['definition'])
     definition.update(plan=new_name, execution=execution)
     warnings = []
