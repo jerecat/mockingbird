@@ -13,6 +13,11 @@
 
 ## Unreleased
 
+- Group human CLI output with blank lines at phase/Job boundaries, summaries,
+  and next actions; indent supporting evidence and multiline errors. Apply the
+  same visual grouping to status/history, doctor, recovery, and tutorials.
+  JSON, subprocess output, saved records/logs, and exit semantics are unchanged.
+
 - Permit ordinary collect during RUNNING runs with per-Job checkpoints. Pick up
   saved executions without waiting for dispatch to finish, retain final outcomes,
   and leave not-yet-recorded Jobs UNCOLLECTED until a later sweep.

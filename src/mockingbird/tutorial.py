@@ -26,7 +26,7 @@ def _continue(automatic: bool) -> bool:
         return True
     while True:
         try:
-            answer = input("Enter to continue, q to stop: ").strip().lower()
+            answer = input("\nEnter to continue, q to stop: ").strip().lower()
         except EOFError:
             return False
         if answer in {"q", "quit"}:
@@ -48,11 +48,11 @@ def _examples() -> Path:
 def _closing(root: Path, complete: bool) -> None:
     print("\nTutorial complete." if complete else "\nTutorial stopped; created files are kept.")
     print(f"Directory: {root}")
-    print("Manual commands below assume this directory:")
+    print("\nManual commands below assume this directory:")
     print(f"  {shlex.join(['cd', str(root)])}")
     print(f"  export MB_STATE_DIR={shlex.quote(str(root / '.mb-state'))}")
     print("Read GUIDE.md for the full sequence and how to continue.")
-    print("MB context/plan: work/sample-collector/.reg/")
+    print("\nMB context/plan: work/sample-collector/.reg/")
     print("MB records/logs: work/sample-collector/runs/<run-id>/")
     print("Project artifacts: work/sample-results/<run-id>/<job-id>/")
     print("\nOptional cleanup, only when you no longer need these files:")
@@ -70,7 +70,7 @@ def run_tutorial(directory: str | None = None, automatic: bool = False, advanced
           "Basics: run two Jobs, collect what is ready, then collect the remaining result.")
     count = "eight" if advanced else "two"
     print("The sample creates text artifacts; it does not run a simulator or clone sources.")
-    print("All exercise files will live in a NEW directory. Existing directories are refused.")
+    print("\nAll exercise files will live in a NEW directory. Existing directories are refused.")
     if directory:
         print(f"Requested directory: {Path(directory).absolute()}")
     else:
@@ -105,9 +105,9 @@ def run_tutorial(directory: str | None = None, automatic: bool = False, advanced
         print(f"Open examples/sample-collector.yaml to inspect the {count} Jobs.")
         print("plan: sample-collector keeps MB data under work/sample-collector/.")
         print("sources: [] uses existing scripts. Each run keeps its plan and records under runs/ there.")
-        print("Each step below prints the ordinary command you can also run yourself.")
+        print("\nEach step below prints the ordinary command you can also run yourself.")
         print("This exercise has its own plan registry so repeated tutorials stay independent.")
-        print(f"$ export MB_STATE_DIR={shlex.quote(env['MB_STATE_DIR'])}", flush=True)
+        print(f"\n$ export MB_STATE_DIR={shlex.quote(env['MB_STATE_DIR'])}", flush=True)
 
         def step(title, explanation, args, expected=0, helper=False):
             print(f"\n--- {title} ---\n{explanation}")
@@ -117,7 +117,7 @@ def run_tutorial(directory: str | None = None, automatic: bool = False, advanced
             else:
                 command = [sys.executable, "-m", "mockingbird.cli", *args]
                 shown = ["mb", *args]
-            print(f"$ {shlex.join(shown)}", flush=True)
+            print(f"\n$ {shlex.join(shown)}\n", flush=True)
             if not _continue(automatic):
                 return False
             with subprocess.Popen(command, cwd=root, env=env) as process:
@@ -127,7 +127,7 @@ def run_tutorial(directory: str | None = None, automatic: bool = False, advanced
                     print("\nWaiting for the active CLI command to stop and save its records...", flush=True)
                     process.wait()
                     raise
-            print(f"Exit code: {returncode} (expected {expected})", flush=True)
+            print(f"\nExit code: {returncode} (expected {expected})", flush=True)
             if returncode != expected:
                 raise RuntimeError("tutorial step failed; files were kept for inspection. "
                                    "Fix the reported error and use GUIDE.md to continue")

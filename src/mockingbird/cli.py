@@ -64,7 +64,7 @@ def _print_checklist(context: dict, selected, selection_meta: dict) -> None:
         f"poll_interval_s={scheduler['poll_interval_s']}, "
         f"capacity={scheduler['capacity_provider']}"
     )
-    print("  jobs:")
+    print("\n  jobs:")
     preview_limit = 20
     for job in selected[:preview_limit]:
         print(f"       - {job.id}")
@@ -74,7 +74,7 @@ def _print_checklist(context: dict, selected, selection_meta: dict) -> None:
 
 def _confirm() -> bool:
     try:
-        answer = input("Proceed with this run? [y/N] ").strip().lower()
+        answer = input("\nProceed with this run? [y/N] ").strip().lower()
     except EOFError:
         return False
     return answer in {"y", "yes"}
@@ -178,7 +178,7 @@ def _command(command, definition, run_dir=None):
 
 
 def _next(command, definition, run_dir=None):
-    print(f"Next: {_command(command, definition, run_dir)}")
+    print(f"\nNext: {_command(command, definition, run_dir)}")
 
 
 def _definition_for(defn):
@@ -199,12 +199,13 @@ def _history(defn, as_json=False):
     if not data['runs']:
         print("No runs yet.")
         return
+    print()
     rows = [("RUN", "EXECUTION", "RESULT", "JOBS")]
     rows += [(r['run_id'], r['execution'], r['result'] or "UNCOLLECTED", str(r['jobs'])) for r in data['runs']]
     widths = [max(len(row[i]) for row in rows) for i in range(4)]
     for row in rows:
         print("  ".join(v.ljust(w) for v, w in zip(row, widths)).rstrip())
-    print(f"Inspect: mb status {defn['plan']} --run <run-id>")
+    print(f"\nInspect: mb status {defn['plan']} --run <run-id>")
     print(f"Saved plan: mb status {defn['plan']} --run <run-id> --plan")
 
 
@@ -220,11 +221,11 @@ def _status(defn: dict, run_dir: str | None, as_json=False, details=False) -> No
         print(json.dumps(data, indent=2))
         return
     print(f"Run:        {data['run_id']}")
-    print(f"Execution:  {data['execution_status']} ({data['recorded']}/{data['total']} records)")
+    print(f"\nExecution:  {data['execution_status']} ({data['recorded']}/{data['total']} records)")
     print(f"Updated:    {_time(data['last_execution_update'])}")
     sweep = data['collection_sweep']
     phase = sweep.get('state', 'NOT_STARTED' if not any(j['observed_at'] for j in data['jobs']) else 'UNKNOWN')
-    print(f"Collection: {data['final']}/{data['total']} final; sweep {phase}")
+    print(f"\nCollection: {data['final']}/{data['total']} final; sweep {phase}")
     counts = data['collection_counts']
     print(f"            pending {counts['PENDING']}  collection errors {counts['ERROR']}  uncollected {counts['UNCOLLECTED']}")
     if sweep:
@@ -247,7 +248,7 @@ def _status(defn: dict, run_dir: str | None, as_json=False, details=False) -> No
         print("\nUse --details for collector reasons and observation times.")
     print("\nLast recorded states; process liveness is not checked.")
     print("Command completion does not imply external completion.")
-    print(f"run: {data['run_dir']}")
+    print(f"\n  run: {data['run_dir']}")
     if data['final'] < data['recorded']:
         _next("collect", defn['plan'], data['run_dir'])
     if data['recorded'] < data['total'] and data['execution_status'] != "RUNNING":
@@ -265,13 +266,16 @@ def _progress(event, execution):
             text += f" (exit={observation['returncode']})"
         elif 'launch_error' in observation or 'executor_error' in observation:
             text += " (execution error)"
+    if event["state"] in {"WAITING_CAPACITY", "EXECUTING"}:
+        print(flush=True)
     print(f"[{event['index']}/{event['total']}] {event['job_id']}: {text}", flush=True)
     if execution and isinstance(execution.observation, dict):
         observation = execution.observation
         error = observation.get("launch_error") or observation.get("executor_error")
         failed = error or observation.get("timed_out") or observation.get("returncode", 0) != 0
         if error:
-            print(f"  {error}", flush=True)
+            for line in str(error).splitlines():
+                print(f"  {line}", flush=True)
         if failed:
             paths = observation.get("execution_context", {})
             if paths.get("job_dir"):
@@ -327,13 +331,16 @@ def _source_summary(observations):
 
 
 def _setup_progress(index, total, job_id, state):
+    if state == "executing":
+        print(flush=True)
     print(f"Setup [{index}/{total}] {job_id}: {state}", flush=True)
 
 
 def _execution_summary(executions, run_dir):
-    print(f"Execution finished: {len(executions)} execution records (external completion not checked)")
-    print("Collection: use status to inspect saved results")
-    print(f"run: {run_dir}", flush=True)
+    print(f"\nExecution finished: {len(executions)} execution records")
+    print("  External completion not checked.")
+    print("  Collection: use status to inspect saved results")
+    print(f"  run: {run_dir}", flush=True)
 
 
 def _doctor_summary(checks, details=False):
@@ -362,7 +369,7 @@ def _doctor_summary(checks, details=False):
         print(f"  {label + ':':<{width + 1}} {state}")
     if any(i.component == "configuration" and i.status.upper() == "PASS" for i in checks):
         print("  Run order: one Job at a time, in list order.")
-    print("No Jobs executed. These checks do not guarantee a successful run.")
+    print("\nNo Jobs executed. These checks do not guarantee a successful run.")
     if details:
         print("\nDiagnostic checks:")
         rows = [("STATUS", "COMPONENT", "CHECK", "MESSAGE")]
@@ -382,8 +389,10 @@ def _doctor_summary(checks, details=False):
             for line in item.message.splitlines():
                 print(f"    {line}")
     if not details:
-        print("Use --details for individual checks and executable paths.")
+        print("\nUse --details for individual checks and executable paths.")
     if doctor_failed(checks):
+        if details:
+            print()
         print("Fix the reported issues, then run doctor again.")
 
 
@@ -419,10 +428,12 @@ def _dispatch(args, parser) -> None:
                            run_dir=getattr(args, "run_dir", None), test_ids=args.test_ids)
         print(f"Source run: {result['run_id']}")
         print(f"Jobs: {result['jobs']}")
-        print(f"Created: {args.output}")
+        print(f"\nCreated: {args.output}")
         print(f"Plan: {args.new_name}")
+        if result['warnings']:
+            sys.stdout.flush()
         for warning in result['warnings']:
-            print(f"Warning: {warning}", file=sys.stderr)
+            print(f"\nWarning: {warning}", file=sys.stderr)
         _next("prepare", args.output)
         return
 
@@ -441,11 +452,11 @@ def _dispatch(args, parser) -> None:
         else:
             print("Preparing workspace...", flush=True)
             context = prepare(defn)
-            print(f"Prepared: {context['plan']}")
-            print(f"Workspace: {context['paths']['workspace']}")
-            print(f"Sources: {len(context['sources'])}")
+            print(f"\nPrepared: {context['plan']}")
+            print(f"  Workspace: {context['paths']['workspace']}")
+            print(f"  Sources: {len(context['sources'])}")
             for source in context['sources']:
-                print(f"  {source['name']}: {source.get('materialization', 'prepared')}")
+                print(f"    {source['name']}: {source.get('materialization', 'prepared')}")
             _next("setup" if setup_required(context) else "plan", defn["plan"])
         return
 
@@ -453,7 +464,7 @@ def _dispatch(args, parser) -> None:
         print("Setting up execution environment...", flush=True)
         attempt = lifecycle.setup(defn, on_progress=_setup_progress)
         if attempt:
-            print(f"Setup complete. Records: {attempt}")
+            print(f"\nSetup complete.\n  Records: {attempt}")
         else:
             print("Setup not required: no setup commands configured.")
         _next("plan", defn["plan"])
@@ -463,13 +474,13 @@ def _dispatch(args, parser) -> None:
         print("Validating plan...", flush=True)
         plan = lifecycle.create_plan(defn)
         args.plan_confirmed = True
-        print(f"Confirmed: {defn['plan']} ({len(plan['jobs'])} jobs)")
+        print(f"\nConfirmed: {defn['plan']} ({len(plan['jobs'])} jobs)")
         for job in plan["jobs"]:
             print(f"  - {job['id']}")
         if args.write_selection:
             jobs = [Job(**item) for item in plan["jobs"]]
             write_selection_file(args.write_selection, jobs)
-            print(f"selection file: {Path(args.write_selection).resolve()}")
+            print(f"\n  selection file: {Path(args.write_selection).resolve()}")
         _next("run", defn["plan"])
         return
 
@@ -484,7 +495,7 @@ def _dispatch(args, parser) -> None:
                                 source_check=_source_check, skip_source_check=args.skip_source_check,
                                 confirm=_confirm_run if args.interactive else None)
         if outcome is None:
-            print("run: cancelled; no Jobs started")
+            print("\nrun: cancelled; no Jobs started")
             return
         executions, run_dir, _ = outcome
         _execution_summary(executions, run_dir)
@@ -521,20 +532,21 @@ def _dispatch(args, parser) -> None:
         context = prepare(defn)
         defn = dict(defn, _invocation_dir=context["invocation_dir"])
         if setup_required(context):
-            print("Setting up execution environment...", flush=True)
+            print("\nSetting up execution environment...", flush=True)
             lifecycle.setup(defn, on_progress=_setup_progress)
-        print("Validating plan...", flush=True)
+        print("\nValidating plan...", flush=True)
         lifecycle.create_plan(defn)
+        print(flush=True)
         selection = _selection(args)
         outcome = lifecycle.run(defn, selection, on_progress=_progress, on_sources=_source_skipped if args.skip_source_check else _source_summary,
                                 source_check=_source_check, skip_source_check=args.skip_source_check,
                                 confirm=_confirm_run if args.interactive else None)
         if outcome is None:
-            print("run: cancelled; no Jobs started")
+            print("\nrun: cancelled; no Jobs started")
             return
         executions, run_dir, _ = outcome
         _execution_summary(executions, run_dir)
-        print("Collection started", flush=True)
+        print("\nCollection started", flush=True)
         result, _ = lifecycle.collect(defn, run_dir)
         _collection_summary(result, run_dir, defn["plan"])
         if result["status"] != "PASS":
@@ -545,14 +557,14 @@ def _dispatch(args, parser) -> None:
 
 
 def _collection_summary(result, run_dir, definition):
-    print(_summary(result))
-    print(f"run: {run_dir}")
+    print("\n" + _summary(result))
+    print(f"  run: {run_dir}")
     if result["status"] != "PASS":
-        print(f"Inspect: {_command('status', definition, run_dir)} --details")
+        print(f"\nInspect: {_command('status', definition, run_dir)} --details")
     if result['summary']['pending'] or result['summary']['collection_error']:
-        print("Collect again after external work finishes or collector errors are resolved.")
+        print("\nCollect again after external work finishes or collector errors are resolved.")
     if result['summary']['uncollected']:
-        print("Jobs without execution records remain uncollected. If run is still active, "
+        print("\nJobs without execution records remain uncollected. If run is still active, "
               "collect again as records arrive. Otherwise, run starts a new run.")
     if any(result['summary'][key] for key in ('pending', 'collection_error', 'uncollected')):
         _next("collect", definition, run_dir)
@@ -566,9 +578,10 @@ def main() -> None:
     except KeyboardInterrupt:
         if args.debug:
             raise
-        print("Interrupted.", file=sys.stderr)
+        sys.stdout.flush()
+        print("\nInterrupted.", file=sys.stderr)
         if args.command in {"run", "collect", "all"}:
-            print("Inspect saved state before retrying (if a run was created):", file=sys.stderr)
+            print("\nInspect saved state before retrying (if a run was created):", file=sys.stderr)
             print(f"  {_command('status', getattr(args, 'plan_name', None) or args.definition, getattr(args, 'run_dir', None))}", file=sys.stderr)
         else:
             print("The operation did not complete; retry it when ready.", file=sys.stderr)
@@ -577,9 +590,13 @@ def main() -> None:
         if args.debug:
             raise
         message = str(exc) or type(exc).__name__
-        print(f"Error: {message}", file=sys.stderr)
+        sys.stdout.flush()
+        lines = message.splitlines()
+        print(f"\nError: {lines[0]}", file=sys.stderr)
+        for line in lines[1:]:
+            print(f"  {line}", file=sys.stderr)
         if isinstance(exc, PrerequisiteError):
-            print("Required steps:", file=sys.stderr)
+            print("\nRequired steps:", file=sys.stderr)
             for step in exc.steps:
                 if step == args.command:
                     break
@@ -587,15 +604,15 @@ def main() -> None:
                     args.definition if args.command in {"prepare", "all", "doctor"} else
                     _definition_for(plan_target(args.definition)))
                 print(f"  {_command(step, target)}", file=sys.stderr)
-            print("Then retry your command.", file=sys.stderr)
+            print("\nThen retry your command.", file=sys.stderr)
         if args.command == "plan":
             if getattr(args, "plan_confirmed", False):
-                print("Plan was confirmed, but follow-up output failed; inspect it with "
+                print("\nPlan was confirmed, but follow-up output failed; inspect it with "
                       f"mb status {args.plan_name} --plan.", file=sys.stderr)
             else:
-                print("Plan confirmation failed; the last successfully confirmed plan was not replaced.", file=sys.stderr)
+                print("\nPlan confirmation failed; the last successfully confirmed plan was not replaced.", file=sys.stderr)
         if not isinstance(exc, (PrerequisiteError, ValueError, OSError, yaml.YAMLError)):
-            print("Use --debug for a traceback.", file=sys.stderr)
+            print("\nUse --debug for a traceback.", file=sys.stderr)
         raise SystemExit(1) from None
 
 

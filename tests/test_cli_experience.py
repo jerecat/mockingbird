@@ -34,6 +34,7 @@ def test_first_run_recovery_and_human_outputs(session):
     missing = cli("run", "test")
     commands = [shlex.split(line.strip())[1:] for line in missing.stderr.splitlines() if line.startswith("  mb ")]
     assert [cmd[0] for cmd in commands] == ["plan"]
+    assert "\n\nRequired steps:" in missing.stderr
     for command in commands:
         completed = cli(*command)
         assert completed.returncode == 0, completed.stderr
@@ -41,6 +42,9 @@ def test_first_run_recovery_and_human_outputs(session):
         assert '"schema_version"' not in completed.stdout
     run = cli("run", "test")
     assert run.returncode == 0 and "Next: mb collect" in run.stdout
+    assert "\n\n[2/2] a_longer_job: executing" in run.stdout
+    assert "\n\nExecution finished:" in run.stdout
+    assert "\n\nNext: mb collect" in run.stdout
     status = cli("status", "test")
     assert status.returncode == 0
     rows = [line for line in status.stdout.splitlines() if line.startswith(("JOB ", "short ", "a_longer_job "))]

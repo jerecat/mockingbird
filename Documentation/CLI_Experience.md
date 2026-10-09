@@ -30,8 +30,8 @@ For example, running before preparation reports on stderr:
 
 ```text
 Error: plan 'sample-collector' is not registered.
-For a new plan, run mb prepare <definition.yaml> from its project directory.
-To restore a registration, run mb prepare <definition.yaml> from its original project directory.
+  For a new plan, run mb prepare <definition.yaml> from its project directory.
+  To restore a registration, run mb prepare <definition.yaml> from its original project directory.
 ```
 
 Before the first prepare, supply your YAML path in place of `<definition.yaml>`.
@@ -129,3 +129,46 @@ require explicit preparation; see [Named plans](Named_Plans.md).
 Launch errors print the reason and execution.json/stderr.log paths immediately.
 Nonzero exit codes and timeouts also print these paths. This reports execution
 evidence and does not change collector or no-check verdict semantics.
+
+## Visual grouping
+
+Human output uses one blank line at a change of meaning: a phase transition,
+Job start or capacity-wait transition, summary, or follow-up action. A Job's
+completion and error evidence stay together. Supporting paths and multiline
+error details are indented under their owning message. Table rows and Job lists
+stay compact; separate the table/list from surrounding guidance instead of
+spacing every row. Status groups execution and collection observations separately.
+
+For example (paths shortened here only):
+
+```text
+Checking sources...
+Sources: 0 checked, 0 tracked-dirty, 0 unknown
+
+[1/2] compile: executing
+[1/2] compile: command finished (exit=0)
+
+[2/2] smoke: executing
+[2/2] smoke: command finished (exit=0)
+
+Execution finished: 2 execution records
+  External completion not checked.
+  Collection: use status to inspect saved results
+  run: .../runs/<run-id>
+
+Next: mb collect smoke --run-dir .../runs/<run-id>
+```
+
+The same grouping applies to stderr recovery guidance and tutorial commands,
+outputs, and expected exit codes. Formatting is owned by the CLI: subprocess
+stdout/stderr, saved logs, record schemas, JSON modes, and exit codes are not
+reformatted. A child's own output can still be dense or lack a trailing newline.
+Human formatting is not a machine parsing contract. No terminal-width detection,
+new dependency, stream wrapper, or screen-clearing behavior is required.
+
+Review a complete terminal transcript, including `all` and tutorial composition,
+not just isolated helper output: check that the current Job, its evidence, the
+summary, and the next action can be located without reading every line. Also
+inspect redirected output, stderr recovery, and JSON parsing. More blank lines
+are not inherently better; preserve compact comparison rows and keep related
+information adjacent.
