@@ -242,6 +242,43 @@ into another orchestration framework. If a project command hands work to an
 external system, that external work remains project/system owned.
 
 
+### Minimize orchestration overhead and own the exit path
+
+Low overhead and predictable termination are design requirements, not cleanup
+work to add after the normal path succeeds.
+
+- Do not add resident daemons, detached monitors, busy-wait loops, or speculative
+  parallelism merely to orchestrate commands. Capacity polling uses an explicit
+  positive interval; status reads saved observations without polling external
+  systems. Keep any helper threads scoped to the operation that needs them.
+- Stream large subprocess output directly to files rather than accumulating it
+  in memory. Keep canonical records small enough to inspect and process; use
+  references for large evidence. This does not promise bounded disk usage or
+  automatic log deletion.
+- Give local project commands finite timeouts. On timeout, the bundled process
+  utility terminates the owned process group, waits through a grace period, and
+  escalates if necessary. Close local log handles and release locks/resources
+  as the operation unwinds. Do not claim control over detached or remote work.
+- Define interruption separately from normal completion and timeout. Currently,
+  Ctrl+C during run stops further dispatch and waits for the active executor to
+  return or time out so its execution evidence can be saved. Graceful shutdown
+  is not an immediate kill and may take the remainder of the Job timeout.
+- Preserve already committed evidence and report incomplete work honestly.
+  Collect may consume saved executions; it does not execute unstarted Jobs.
+  Forced termination (including SIGKILL), storage failure, and custom plugins
+  that do not return are outside a blanket clean-shutdown guarantee.
+
+For every new worker, polling loop, or subprocess, explain why it is needed,
+what limits its load and lifetime, who stops/waits for it, and what evidence
+survives interruption. Prefer the smallest mechanism that answers those
+questions. Serial local dispatch alone does not limit overlapping remote jobs;
+external capacity and cancellation remain project/provider responsibilities.
+
+See [Execution contract](Execution_Contract.md#execution-evidence-is-not-a-test-result),
+[architecture contracts AC-5/6/18/19](Architecture_Contract.md), and
+[ADR 0009](ADR/0009-serial-execution-policy.md) for the current mechanisms.
+
+
 ## Principle 10: Shorthand does not weaken the contract
 
 Users can declare every field for every Job. Defaults reduce repetition, not
