@@ -23,7 +23,7 @@ left by an interrupted sweep. `mb status PLAN --history` lists runs.
 | started_at, finished_at, duration_s | MB dispatch/execution timing, not external simulation completion |
 | error | Execution-control error, when present |
 | selection | Selected Job IDs and selection provenance |
-| source_observations | Prepare-time commit, run-start HEAD and dirty state per supported source |
+| source_observations | Prepare-time commit, run-start HEAD and `tracked_dirty` (true/false/null) per supported source |
 | scheduler | Recorded dispatch settings |
 | jobs | Job record/log locations |
 | checkpoint_storage | Internal checkpoint layout |
@@ -107,3 +107,23 @@ runs remain readable and collectable. Recollecting an old run publishes a schema
 result, but leaves its run.json byte-for-byte unchanged, including any historical
 collection_status/result_status/collected_at fields. Those legacy fields are not
 updated and must not be used to read current results; use result.json.
+
+Source checks print `Checking sources...` before observation and a compact count
+afterwards. Only supported observations count as checked; unsupported providers
+are omitted. Errors remain visible and are recorded with an unknown dirty state.
+Git checks exclude untracked files (including in submodules). `tracked_dirty: false`
+does not establish a reproducible worktree. Old `dirty` records remain readable.
+TTY progress grows dots on one line; redirected output contains no animation.
+The CLI constants `SOURCE_PROGRESS_INTERVAL_S` (0.4 seconds) and
+`SOURCE_PROGRESS_MAX_DOTS` (6) control the animation. Each Git observation command
+retains its existing 10-second subprocess timeout; filesystem stalls can still
+make checks slow.
+
+Use `mb run PLAN --skip-source-check` to bypass all run-start source observations
+(including Git HEAD and tracked-dirty checks). Execution and collection work as
+usual. The CLI prints `Sources: skipped (--skip-source-check)`; run.json records
+`source_check_skipped: true` and empty `source_observations`. Otherwise the flag
+is false. Missing flags in older records do not establish whether checks ran.
+`save` warns that run-time source state is unknown and uses the preparation
+revision when available. `mb all YAML --skip-source-check` supports the same
+option, but still performs normal preparation and its source acquisition.

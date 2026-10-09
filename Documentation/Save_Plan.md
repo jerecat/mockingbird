@@ -22,6 +22,10 @@ collectors and metadata, plus the original setup, scheduler, sources and project
 metadata. Dependencies between Jobs are not inferred; a selected Job may still
 need build or preceding Jobs that the user must include.
 
+Run-start checks inspect tracked files only (`tracked_dirty`); untracked files
+are not scanned. Save always warns about this limitation for these records.
+Older records using `dirty` remain readable.
+
 Git source revisions are pinned to recorded run-start commits. Dirty observations
 produce a warning on stderr and a comment in the YAML: uncommitted changes are
 not included. Unknown observations also warn; absent run-start HEAD falls back

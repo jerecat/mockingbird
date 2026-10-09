@@ -271,7 +271,7 @@ Prepare acquires sources only when no checkout exists. Existing Git/SVN working
 trees are reused without updates or deletion, including local edits and build
 outputs. To change revisions, use Git/SVN yourself or prepare another named plan.
 Recorded revisions are prepare-time metadata, not snapshots of source contents.
-Run-start Git HEAD and dirty observations are saved in run.json; edits during run are not tracked. See
+Run-start Git HEAD and tracked-file dirty observations are saved in run.json; edits during run are not tracked. See
 [ADR 0011](Documentation/ADR/0011-reuse-user-managed-source-trees.md).
 
 ```bash
@@ -446,3 +446,12 @@ slots, three Jobs, and manual completion from a second terminal.
 
 For lifecycle responsibility checks and targeted mutation testing, see
 [Lifecycle testing](Documentation/Lifecycle_Testing.md).
+
+Use `mb run PLAN --skip-source-check` to bypass all run-start source observations
+(including Git HEAD and tracked-dirty checks). Execution and collection work as
+usual. The CLI prints `Sources: skipped (--skip-source-check)`; run.json records
+`source_check_skipped: true` and empty `source_observations`. Otherwise the flag
+is false. Missing flags in older records do not establish whether checks ran.
+`save` warns that run-time source state is unknown and uses the preparation
+revision when available. `mb all YAML --skip-source-check` supports the same
+option, but still performs normal preparation and its source acquisition.

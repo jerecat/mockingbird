@@ -264,8 +264,10 @@ The previous `last_result.json` pointer is no longer used or written.
 Each run saves optional provider observations in `run.json` under
 `source_observations`, keyed by source name. Git records `prepared_commit`
 (from the latest successful preparation used by the confirmed plan),
-`current_commit` and `dirty`. These are displayed before dispatch. Dirty includes
-staged, unstaged and untracked changes, excluding ignored files. It is relative
+`current_commit` and `tracked_dirty` (true, false or null for unknown). The CLI
+prints a start message before checking and a compact summary before dispatch;
+commit details remain in run.json. Tracked dirty includes staged and unstaged
+changes, excluding untracked and ignored files, also within submodules. It is relative
 to current HEAD, not a comparison with the prepared working tree. Reprepare
 refreshes the baseline; old run records remain unchanged.
 
@@ -275,3 +277,12 @@ is performed. Diffs, ignored build products and edits during execution are not
 captured; this is provenance, not a source snapshot or reproducibility guarantee.
 Providers may implement optional `observe(source)`; providers without it continue
 unchanged. `doctor YAML` and `all YAML` remain pre-preparation entry points.
+
+Use `mb run PLAN --skip-source-check` to bypass all run-start source observations
+(including Git HEAD and tracked-dirty checks). Execution and collection work as
+usual. The CLI prints `Sources: skipped (--skip-source-check)`; run.json records
+`source_check_skipped: true` and empty `source_observations`. Otherwise the flag
+is false. Missing flags in older records do not establish whether checks ran.
+`save` warns that run-time source state is unknown and uses the preparation
+revision when available. `mb all YAML --skip-source-check` supports the same
+option, but still performs normal preparation and its source acquisition.

@@ -303,27 +303,52 @@ def test_git_run_observations_and_reprepare(operator):
         path = Path(status['run_dir']) / 'run.json'
         records.append((path, path.read_bytes()))
         obs = json.loads(path.read_text())['source_observations']['dut']
-        assert 'Source: dut' in output
+        assert 'Checking sources...' in output
+        assert 'Sources: 1 checked,' in output
         return obs
     (tree / 'ignored').touch()
-    assert run() == dict(prepared_commit=first, current_commit=first, dirty=False)
+    assert run() == dict(prepared_commit=first, current_commit=first, tracked_dirty=False)
     (tree / 'untracked').touch()
-    assert run()['dirty'] is True
+    assert run()['tracked_dirty'] is False
     (tree / 'untracked').unlink()
     (tree / 'tracked').write_text('edited')
-    assert run()['dirty'] is True
+    assert run()['tracked_dirty'] is True
     cli(caller, 'prepare', definition)
     cli(caller, 'plan', 'smoke')
-    assert run() == dict(prepared_commit=first, current_commit=first, dirty=True)
+    assert run() == dict(prepared_commit=first, current_commit=first, tracked_dirty=True)
     git(tree, 'add', 'tracked')
-    assert run()['dirty'] is True
+    assert run()['tracked_dirty'] is True
     git(tree, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'edit')
     second = git(tree, 'rev-parse', 'HEAD')
-    assert run() == dict(prepared_commit=first, current_commit=second, dirty=False)
+    assert run() == dict(prepared_commit=first, current_commit=second, tracked_dirty=False)
     cli(caller, 'prepare', definition)
     cli(caller, 'plan', 'smoke')
-    assert run() == dict(prepared_commit=second, current_commit=second, dirty=False)
+    assert run() == dict(prepared_commit=second, current_commit=second, tracked_dirty=False)
     shutil.rmtree(tree)
     failed_observation = run()
-    assert failed_observation['dirty'] is None and 'error' in failed_observation
+    assert failed_observation['tracked_dirty'] is None and 'error' in failed_observation
+    output = cli(caller, 'run', 'smoke', '--skip-source-check').stdout
+    assert 'Sources: skipped (--skip-source-check)' in output
+    assert 'Checking sources' not in output
+    exported = cli(caller, 'save', 'smoke', '--as', 'repro', '--output', caller / 'repro.yml')
+    assert 'run-time HEAD unknown' in exported.stderr
+    assert 'clean/dirty state unknown' in exported.stderr
     assert all(path.read_bytes() == contents for path, contents in records)
+
+
+@pytest.mark.parametrize('command', ['run', 'all'])
+def test_skip_source_check_cli(operator, command):
+    project, caller, definition, data, cli = operator
+    if command == 'run':
+        cli(project, 'prepare', definition)
+        cli(caller, 'plan', 'smoke')
+    target = 'smoke' if command == 'run' else definition
+    output = cli(caller, command, target, '--skip-source-check').stdout
+    assert 'Sources: skipped (--skip-source-check)' in output
+    assert 'Checking sources' not in output
+    state = json.loads(cli(caller, 'status', 'smoke', '--json').stdout)
+    record = json.loads((Path(state['run_dir']) / 'run.json').read_text())
+    assert record['source_check_skipped'] is True
+    assert record['source_observations'] == {}
+    assert record['status'] == 'EXECUTED'
+    cli(caller, 'collect', 'smoke')

@@ -4,7 +4,8 @@ import argparse
 import json
 import shlex
 import sys
-from contextlib import redirect_stdout
+from contextlib import contextmanager, redirect_stdout
+from threading import Event, Thread
 from datetime import datetime
 
 import yaml
@@ -149,6 +150,9 @@ def build_parser() -> argparse.ArgumentParser:
     all_cmd = sub.choices["all"]
     _add_selection_args(all_cmd)
     all_cmd.add_argument("--interactive", action="store_true")
+    for cmd in (run, all_cmd):
+        cmd.add_argument("--skip-source-check", action="store_true",
+                         help="skip run-start source observations; record source state as unknown")
 
     sub.choices["doctor"].add_argument("--details", action="store_true", help="show every diagnostic check")
     status.add_argument("--details", action="store_true", help="include collector reasons and observation times")
@@ -275,15 +279,49 @@ def _progress(event, execution):
 
 
 
+SOURCE_PROGRESS_INTERVAL_S = 0.4
+SOURCE_PROGRESS_MAX_DOTS = 6
+
+
+@contextmanager
+def _source_check():
+    stream = sys.stdout
+    animated = stream.isatty()
+    stop = Event()
+    print("Checking sources...", end="" if animated else "\n", file=stream, flush=True)
+
+    def animate():
+        dots = 3
+        while not stop.wait(SOURCE_PROGRESS_INTERVAL_S):
+            dots = dots % SOURCE_PROGRESS_MAX_DOTS + 1
+            print("\rChecking sources" + "." * dots + " " * (SOURCE_PROGRESS_MAX_DOTS - dots),
+                  end="", file=stream, flush=True)
+
+    worker = Thread(target=animate, daemon=True) if animated else None
+    try:
+        if worker:
+            worker.start()
+        yield
+    finally:
+        stop.set()
+        if worker:
+            worker.join()
+            print(file=stream, flush=True)
+
+
+def _source_skipped(observations):
+    print("Sources: skipped (--skip-source-check)", flush=True)
+
+
 def _source_summary(observations):
+    dirty = sum(item.get("tracked_dirty", item.get("dirty")) is True
+                for item in observations.values())
+    unknown = sum(item.get("tracked_dirty", item.get("dirty")) is None
+                  for item in observations.values())
+    print(f"Sources: {len(observations)} checked, {dirty} tracked-dirty, {unknown} unknown", flush=True)
     for name, item in observations.items():
-        print(f"Source: {name}")
-        print(f"  Prepared: {item.get('prepared_commit') or 'unknown'}")
-        dirty = item.get("dirty")
-        state = "unknown" if dirty is None else "dirty" if dirty else "clean"
-        print(f"  Current:  {item.get('current_commit') or 'unknown'} ({state})")
         if item.get("error"):
-            print(f"  Observation: {item['error']}")
+            print(f"  {name}: {item['error']}", flush=True)
 
 
 def _setup_progress(index, total, job_id, state):
@@ -440,7 +478,8 @@ def _dispatch(args, parser) -> None:
 
     if args.command == "run":
         selection = _selection(args)
-        outcome = lifecycle.run(defn, selection, on_progress=_progress, on_sources=_source_summary,
+        outcome = lifecycle.run(defn, selection, on_progress=_progress, on_sources=_source_skipped if args.skip_source_check else _source_summary,
+                                source_check=_source_check, skip_source_check=args.skip_source_check,
                                 confirm=_confirm_run if args.interactive else None)
         if outcome is None:
             print("run: cancelled; no Jobs started")
@@ -485,7 +524,8 @@ def _dispatch(args, parser) -> None:
         print("Validating plan...", flush=True)
         lifecycle.create_plan(defn)
         selection = _selection(args)
-        outcome = lifecycle.run(defn, selection, on_progress=_progress, on_sources=_source_summary,
+        outcome = lifecycle.run(defn, selection, on_progress=_progress, on_sources=_source_skipped if args.skip_source_check else _source_summary,
+                                source_check=_source_check, skip_source_check=args.skip_source_check,
                                 confirm=_confirm_run if args.interactive else None)
         if outcome is None:
             print("run: cancelled; no Jobs started")

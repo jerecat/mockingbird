@@ -212,13 +212,14 @@ def preview(defn: dict[str, Any], selection: Selection) -> tuple[dict, list[Job]
 
 
 def run(
-    defn: dict[str, Any], selection: Selection | None = None, *, on_progress=None, confirm=None, on_sources=None
+    defn: dict[str, Any], selection: Selection | None = None, *, on_progress=None, confirm=None, on_sources=None, source_check=None, skip_source_check=False
 ) -> tuple[list[JobExecution], Path, dict] | None:
     with prepared_environment(defn):
-        return _run(defn, selection, on_progress=on_progress, confirm=confirm, on_sources=on_sources)
+        return _run(defn, selection, on_progress=on_progress, confirm=confirm, on_sources=on_sources, source_check=source_check,
+                    skip_source_check=skip_source_check)
 
 
-def _run(defn, selection=None, *, on_progress=None, confirm=None, on_sources=None):
+def _run(defn, selection=None, *, on_progress=None, confirm=None, on_sources=None, source_check=None, skip_source_check=False):
     selection = selection or Selection()
     plan = load_plan(defn)
     context = copy.deepcopy(plan["context"])
@@ -234,15 +235,17 @@ def _run(defn, selection=None, *, on_progress=None, confirm=None, on_sources=Non
         return None
 
     source_observations = {}
-    for source in context.get("sources", []):
-        try:
-            provider = load_source_provider(source["provider"])
-            observe = getattr(provider, "observe", None)
-            observation = observe(source) if observe else None
-        except Exception as exc:
-            observation = {"error": f"{type(exc).__name__}: {exc}"}
-        if observation is not None:
-            source_observations[source["name"]] = observation
+    if not skip_source_check:
+        with source_check() if source_check else nullcontext():
+            for source in context.get("sources", []):
+                try:
+                    provider = load_source_provider(source["provider"])
+                    observe = getattr(provider, "observe", None)
+                    observation = observe(source) if observe else None
+                except Exception as exc:
+                    observation = {"error": f"{type(exc).__name__}: {exc}"}
+                if observation is not None:
+                    source_observations[source["name"]] = observation
 
     with file_lock(metadata_path(defn) / "start.lock", blocking=True):
         run_id = _timestamp_id(str(context["plan"]))
@@ -261,6 +264,7 @@ def _run(defn, selection=None, *, on_progress=None, confirm=None, on_sources=Non
             "run_id": run_id,
             "checkpoint_storage": "per-job",
             "source_observations": source_observations,
+            "source_check_skipped": skip_source_check,
             "plan": context.get("plan", context.get("name")),
             "status": "RUNNING",
             "started_at": _now(),

@@ -78,15 +78,18 @@ class Provider(SourceProvider):
             if prepared.get('resolved_revision'):
                 source['revision'] = prepared['resolved_revision']
             warnings.append(f"source {name!r}: run-time HEAD unknown; using preparation revision when available")
-        if observation.get('dirty') is True:
+        dirty = observation.get('tracked_dirty', observation.get('dirty'))
+        if 'tracked_dirty' in observation:
+            warnings.append(f"source {name!r}: untracked files were not checked and are not included")
+        if dirty is True:
             warnings.append(f"source {name!r} was dirty; uncommitted changes are not included")
-        elif observation.get('dirty') is not False:
+        elif dirty is not False:
             warnings.append(f"source {name!r}: clean/dirty state unknown; working-tree changes are not included")
         return warnings
 
     def observe(self, source):
         observation = {"prepared_commit": source.get("resolved_revision"),
-                       "current_commit": None, "dirty": None}
+                       "current_commit": None, "tracked_dirty": None}
         destination = Path(source["path"])
         def inspect(*args):
             return subprocess.run(["git", *args], cwd=destination, check=True,
@@ -94,7 +97,8 @@ class Provider(SourceProvider):
                                   timeout=10).stdout.strip()
         try:
             observation["current_commit"] = inspect("rev-parse", "HEAD")
-            observation["dirty"] = bool(inspect("status", "--porcelain", "--untracked-files=normal"))
+            observation["tracked_dirty"] = bool(inspect("status", "--porcelain", "--untracked-files=no",
+                                                        "--ignore-submodules=untracked"))
         except Exception as exc:
             observation["error"] = f"{type(exc).__name__}: {exc}"
         return observation

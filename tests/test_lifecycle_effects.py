@@ -83,3 +83,21 @@ def test_final_collection_does_not_reexecute_or_recollect(tmp_path, monkeypatch)
     assert second['summary'] == first['summary']
     assert second['jobs'] == first['jobs']
     assert all(p.read_bytes() == contents for p, contents in evidence.items())
+
+
+def test_skip_source_check_never_loads_provider(tmp_path, monkeypatch):
+    from mockingbird.io import read_json, write_json
+    from mockingbird.context import metadata_path
+    d = definition(tmp_path)
+    prepare(d)
+    lifecycle.create_plan(d)
+    path = metadata_path(d) / 'plan.json'
+    plan = read_json(path)
+    plan['context']['sources'] = [{'name': 'unavailable', 'provider': 'git', 'path': '/missing'}]
+    write_json(path, plan)
+    monkeypatch.setattr(lifecycle, 'load_source_provider', forbidden)
+    executions, run_dir, _ = lifecycle.run(d, skip_source_check=True, source_check=forbidden)
+    assert len(executions) == 2
+    record = read_json(run_dir / 'run.json')
+    assert record['source_check_skipped'] is True
+    assert record['source_observations'] == {}
