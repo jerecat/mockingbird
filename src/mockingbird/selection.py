@@ -8,6 +8,7 @@ from typing import Iterable
 
 from .io import read_json
 from .models import Job
+from .results import final_results
 
 
 @dataclass
@@ -40,7 +41,7 @@ def failed_ids(value: str | Path) -> set[str]:
     result = read_json(result_path)
     return {
         str(test["id"])
-        for test in result.get("tests", [])
+        for test in final_results(result)
         if str(test.get("status", "")).upper() == "FAIL"
     }
 
@@ -85,7 +86,7 @@ def select_jobs(jobs: list[Job], selection: Selection) -> tuple[list[Job], dict]
         prior_result = read_json(result_path)
         selected_ids &= {
             str(test["id"])
-            for test in prior_result.get("tests", [])
+            for test in final_results(prior_result)
             if str(test.get("status", "")).upper() == "FAIL"
         }
         metadata["failed_from"] = str(result_path)

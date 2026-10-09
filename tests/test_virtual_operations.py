@@ -1,4 +1,5 @@
 """CLI rehearsal against a file-backed, project-owned external service."""
+from mockingbird.results import final_results
 import hashlib
 import json
 import os
@@ -151,7 +152,7 @@ def test_virtual_operator_lifecycle(tmp_path):
     first = collect('first', 2)
     assert first['summary'] == {'total': 7, 'pass': 4, 'fail': 1, 'error': 0, 'skip': 0,
                                 'pending': 1, 'uncollected': 0, 'collection_error': 1}
-    final_ids = {test['id'] for test in first['tests']}
+    final_ids = {test['id'] for test in final_results(first)}
     assert {'compile', 'pause', 'cleanup'}.issubset(final_ids)
     assert not {'sim_late', 'sim_retry'} & final_ids
     boundary = len(events())
@@ -171,7 +172,7 @@ def test_virtual_operator_lifecycle(tmp_path):
     fourth = collect('already complete', 1)
     assert len(events()) == boundary
     assert (first_run / 'collection.json').read_bytes() == journal
-    assert third['tests'] == fourth['tests']
+    assert final_results(third) == final_results(fourth)
     cli('status', '--run-dir', first_run)
 
     # Repair outside MB, then rerun only the final FAIL as a new run.
@@ -188,7 +189,7 @@ def test_virtual_operator_lifecycle(tmp_path):
     retry_result = read(retry_run / 'result.json')
     assert retry_result['status'] == 'PASS' and retry_result['summary']['total'] == 1
     assert (first_run / 'result.json').read_bytes() == prior_result
-    assert retry_result['tests'][0]['artifacts'] == ['external://' + retry_run.name + '/sim_fail']
+    assert final_results(retry_result)[0]['artifacts'] == ['external://' + retry_run.name + '/sim_fail']
 
     # A malformed contract is rejected in plan, with no accidental submissions.
     definition['plan'] = 'bad'

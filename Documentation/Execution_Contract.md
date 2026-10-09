@@ -215,15 +215,16 @@ attempt. Concurrent collect calls for the same run are rejected using a file loc
 A crash after an external collector runs but before its checkpoint is written can
 repeat that call; project collectors should therefore be safe to call again.
 
-result.json contains only final judgements in tests, with separate collection
-states. Its summary counts pass/fail/error/skip plus pending, uncollected, and
+result.json schema 4 has one jobs entry per selected Job, containing its collection
+state and optional final result. There is no duplicate tests/collection list. Its summary counts pass/fail/error/skip plus pending, uncollected, and
 collection_error; total always refers to the selected set. Until every Job has a
 final result, aggregate status is PENDING, even if some final FAILs already exist.
 Once complete, aggregate status is FAIL if any final FAIL/ERROR exists, else PASS.
-run.json preserves execution status separately from collection_status.
+run.json records execution only and is never written by collect.
 
 CLI collect/all exit codes: 0 = complete PASS, 1 = complete FAIL, 2 = incomplete
-collection. Detailed pending/error state is in result.json and collection.json.
+collection. Read result.json for pending/error state; collection.json files are internal recovery data.
+See [Record formats](Record_Formats.md) for the complete user-facing format.
 
 ## Capacity and migration
 

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from mockingbird.results import final_results
 
 from pathlib import Path
 
@@ -76,7 +77,7 @@ def test_declarative_contract_runs_without_project_python(tmp_path, monkeypatch)
         "uncollected": 0,
         "collection_error": 0,
     }
-    assert [item["artifacts"] for item in result["tests"]] == [
+    assert [item["artifacts"] for item in final_results(result)] == [
         ["artifact://pass"],
         ["artifact://fail"],
     ]

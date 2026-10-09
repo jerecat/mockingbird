@@ -248,6 +248,11 @@ the control of project scripts.
 the plan used by a past run. `mb status smoke --history` lists runs and results.
 All these operations work without the original YAML.
 
+Read `run.json` for execution evidence and `result.json` for collection state and
+verdicts. Collect never updates run.json. Result schema 4 stores each Job once in
+`jobs`, replacing the old `tests`/`collection` duplication. See
+[Record formats](Documentation/Record_Formats.md) for fields, examples and compatibility.
+
 ## Lifecycle
 
 `mb run` shows command progress. Use `mb status <plan>` from another

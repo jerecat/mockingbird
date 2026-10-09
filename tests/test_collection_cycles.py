@@ -1,3 +1,4 @@
+from mockingbird.results import final_results
 import json
 import sys
 from pathlib import Path
@@ -56,15 +57,15 @@ else: print(json.dumps({'status':'FAIL' if job == 'b' else 'PASS', 'artifacts':[
     assert first["summary"] == dict(total=3, **{"pass": 1}, fail=0, error=0, skip=0, pending=1, uncollected=0, collection_error=1)
     second, _ = lifecycle.collect(defn, run)
     assert second["status"] == "FAIL" and second["collection_complete"]
-    assert second["tests"][0] == first["tests"][0]
-    assert [second["collection"][j]["attempts"] for j in ["a", "b", "c"]] == [1, 2, 2]
+    assert final_results(second)[0] == final_results(first)[0]
+    assert [second["jobs"][j]["attempts"] for j in ["a", "b", "c"]] == [1, 2, 2]
     third, _ = lifecycle.collect(defn, run)
-    assert third["collection"] == second["collection"]
+    assert third["jobs"] == second["jobs"]
     assert (run / "executions.json").read_bytes() == evidence
     _, other_run, _ = lifecycle.run(defn)
     other, _ = lifecycle.collect(defn, other_run)
     assert other["status"] == "PENDING"  # Same Job IDs, fresh run identity.
-    assert other["tests"][0]["artifacts"] != first["tests"][0]["artifacts"]
+    assert final_results(other)[0]["artifacts"] != final_results(first)[0]["artifacts"]
     assert read_json(run / "run.json")["status"] == "EXECUTED"
 
 
@@ -88,7 +89,7 @@ def test_completed_checkpoint_survives_interrupted_collect(tmp_path, monkeypatch
     monkeypatch.setattr(adapter, "collect", original)
     result, _ = lifecycle.collect(defn, run)
     assert result["status"] == "PASS"
-    assert result["collection"]["a"]["attempts"] == 1
+    assert result["jobs"]["a"]["attempts"] == 1
 
 
 def test_execution_evidence_is_saved_before_next_job_and_survives_error(tmp_path, monkeypatch):
@@ -147,7 +148,7 @@ def test_cli_pending_exit_code_and_completed_noop(tmp_path, monkeypatch):
     main()
     script.write_text('raise RuntimeError("must not run")')
     main()
-    assert read_json(run / "result.json")["collection"]["a"]["attempts"] == 2
+    assert read_json(run / "result.json")["jobs"]["a"]["attempts"] == 2
 
 
 def test_mismatched_custom_result_id_is_retryable_collection_error(tmp_path, monkeypatch):
@@ -158,9 +159,50 @@ def test_mismatched_custom_result_id_is_retryable_collection_error(tmp_path, mon
     monkeypatch.setattr(adapter, "collect", lambda *_: [TestResult("wrong", "PASS")])
     monkeypatch.setattr(lifecycle, "load_adapter", lambda _: adapter)
     result, _ = lifecycle.collect(defn, run)
-    assert result["tests"] == []
+    assert final_results(result) == []
     assert result["summary"]["collection_error"] == 1
     monkeypatch.setattr(adapter, "collect", lambda *_: [TestResult("a", "FAIL")])
     result, _ = lifecycle.collect(defn, run)
     assert result["status"] == "FAIL"
-    assert result["collection"]["a"]["attempts"] == 2
+    assert result["jobs"]["a"]["attempts"] == 2
+
+
+def test_result_format_and_collect_never_write_run(tmp_path, monkeypatch):
+    defn = make_run(tmp_path, monkeypatch)
+    _, run, _ = lifecycle.run(defn)
+    run_path = run / 'run.json'
+    original = run_path.read_bytes()
+    stamp = run_path.stat().st_mtime_ns
+    real_write = lifecycle.write_json
+    def guard(path, value):
+        assert Path(path) != run_path, 'collect must not write run.json'
+        real_write(path, value)
+    monkeypatch.setattr(lifecycle, 'write_json', guard)
+    result, _ = lifecycle.collect(defn, run)
+    assert result['schema_version'] == 4
+    assert not {'tests', 'collection', 'finished_at', 'duration_s'} & result.keys()
+    assert set(result['jobs']) == {'a', 'b'}
+    for name, entry in result['jobs'].items():
+        assert entry['state'] == 'COMPLETE'
+        assert entry['result']['id'] == name
+        assert entry['result']['status'] == 'PASS'
+        assert entry['attempts'] == 1
+    lifecycle.collect(defn, run)
+    assert run_path.read_bytes() == original and run_path.stat().st_mtime_ns == stamp
+    assert not {'collection_status', 'result_status', 'collected_at'} & read_json(run_path).keys()
+
+
+def test_failed_selection_accepts_old_and_new_result_formats(tmp_path):
+    from mockingbird.selection import failed_ids, select_jobs, Selection
+    from mockingbird.models import Job
+    for data in [
+        {'schema_version': 3, 'tests': [{'id': 'a', 'status': 'FAIL'}, {'id': 'b', 'status': 'PASS'}]},
+        {'schema_version': 4, 'jobs': {
+            'a': {'state': 'COMPLETE', 'result': {'id': 'a', 'status': 'FAIL'}},
+            'b': {'state': 'COMPLETE', 'result': {'id': 'b', 'status': 'PASS'}},
+            'c': {'state': 'ERROR', 'reason': 'collector failed'}}},
+    ]:
+        path = tmp_path / 'result.json'; path.write_text(json.dumps(data))
+        assert failed_ids(path) == {'a'}
+        selected, _ = select_jobs([Job('a'), Job('b'), Job('c')], Selection(failed_from=str(path)))
+        assert [job.id for job in selected] == ['a']

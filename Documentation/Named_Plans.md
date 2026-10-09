@@ -173,7 +173,7 @@ available. It can also inspect another operator's compatible records without
 registering or replacing that plan locally; the supplied name must match the
 name in the saved run. A run with a different plan name is rejected.
 
-Each collect replaces that run's result.json with the latest aggregate result.
+Each collect replaces that run's result.json with the latest aggregate result, without writing run.json.
 Final Job verdicts stay fixed; unresolved Jobs can be collected again. Even a
 collect of an already-final run regenerates the aggregate's generated_at. Use
 started_at, not collection time, to order runs. The history command reads run.json
@@ -255,8 +255,7 @@ mb collect old-name --run-dir /absolute/path/to/old/run
 ```
 
 Their recorded scripts/artifact paths must still be available for collection.
-New prepared contexts use schema 2 and `plan` instead of `name`; plan, run and result records
-use schema 3. Per-run `plan.json` embeds the context, so new runs do not write a
+New prepared contexts use schema 2 and `plan` instead of `name`; plan and run records use schema 3; new result records use schema 4. Per-run `plan.json` embeds the context, so new runs do not write a
 second context.json copy. Legacy runs retain their original context.json.
 The previous `last_result.json` pointer is no longer used or written.
 

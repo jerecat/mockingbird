@@ -1,4 +1,5 @@
 """A real SIGINT must leave a collectable partial run."""
+from mockingbird.results import final_results
 import json
 import os
 from pathlib import Path
@@ -89,11 +90,11 @@ def test_sigint_drains_current_job_and_preserves_partial_collection(tmp_path):
     assert result["summary"]["total"] == 3
     assert result["summary"]["pass"] == 2
     assert result["summary"]["uncollected"] == 1
-    assert "not-started" not in {t["id"] for t in result["tests"]}
+    assert "not-started" not in {t["id"] for t in final_results(result)}
     assert read(run / "run.json")["status"] == "INTERRUPTED"
     again = cli("collect", "test", "--run-dir", str(run))
     assert again.returncode == 2
-    assert read(run / "result.json")["collection"] == result["collection"]
+    assert read(run / "result.json")["jobs"] == result["jobs"]
     assert (run / "executions.json").read_bytes() == evidence
 
 
@@ -122,5 +123,5 @@ def test_interrupt_before_first_dispatch_is_collectable(tmp_path, monkeypatch):
     assert read(run / "executions.json") == []
     result, _ = lifecycle.collect(defn, run)
     assert result["status"] == "PENDING"
-    assert result["tests"] == []
+    assert final_results(result) == []
     assert result["summary"]["uncollected"] == 1

@@ -81,5 +81,5 @@ def test_final_collection_does_not_reexecute_or_recollect(tmp_path, monkeypatch)
         patch.setattr(Adapter, 'collect', forbidden)
         second, _ = lifecycle.collect(d, run_dir)
     assert second['summary'] == first['summary']
-    assert second['collection'] == first['collection']
+    assert second['jobs'] == first['jobs']
     assert all(p.read_bytes() == contents for p, contents in evidence.items())

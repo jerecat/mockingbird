@@ -164,7 +164,7 @@ def test_legacy_schema_two_runs_remain_collectable(tmp_path):
     write_json(rd / "run.json", record)
     result, _ = lifecycle.collect(d, rd)
     assert result["collection_complete"]
-    assert lifecycle.collect(d, rd)[0]["collection"] == result["collection"]
+    assert lifecycle.collect(d, rd)[0]["jobs"] == result["jobs"]
 
 
 @pytest.mark.parametrize("value", [True, False, "1", float("nan"), float("inf"), -1, 0])

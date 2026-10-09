@@ -53,7 +53,8 @@ The default output shows:
 `status --json` returns this observation snapshot for scripts. The default status
 output is now human-readable rather than the old raw `result.json` output.
 Consumers requiring final result data should continue reading the run's
-`result.json`; that format and the collector contract are unchanged.
+`result.json`; see [Record formats](Record_Formats.md) for schema 4. The collector
+contract and status snapshot format are unchanged.
 
 ## External state uses the existing collector contract
 
@@ -91,3 +92,5 @@ Select one with `--run <run-id>`. Add `--plan` to inspect its exact saved plan,
 or use `--plan` alone for the current confirmed contents. All views work without
 the original YAML. Without a selector, status/collect use the latest-started run;
 completion or collection of an older run never changes that default.
+
+See [Record formats](Record_Formats.md): run.json owns execution evidence; result.json owns collection and verdicts.

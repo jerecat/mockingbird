@@ -1,4 +1,5 @@
 """Exercise the shipped reference scripts through the public CLI."""
+from mockingbird.results import final_results
 import json
 import os
 from pathlib import Path
@@ -32,7 +33,7 @@ def test_mock_simv_user_journey(tmp_path):
     assert first["summary"] == {"total": 8, "pass": 2, "fail": 1, "error": 1,
                                 "skip": 1, "pending": 1, "uncollected": 0, "collection_error": 2}
     assert first["status"] == "PENDING"
-    for test in first["tests"]:
+    for test in final_results(first):
         if test["id"] == "test_no_check":
             assert test["artifacts"] == []
         else:
@@ -45,8 +46,8 @@ def test_mock_simv_user_journey(tmp_path):
     assert second["collection_complete"] and second["status"] == "FAIL"
     assert second["summary"] == {"total": 8, "pass": 5, "fail": 1, "error": 1,
                                  "skip": 1, "pending": 0, "uncollected": 0, "collection_error": 0}
-    for result in first["tests"]:
-        assert result == next(t for t in second["tests"] if t["id"] == result["id"])
+    for result in final_results(first):
+        assert result == next(t for t in final_results(second) if t["id"] == result["id"])
     cli("collect", "--run-dir", str(rd), expected=1)
     for job in root.iterdir():
         calls = job / "collector_calls.txt"

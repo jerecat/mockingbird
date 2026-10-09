@@ -1,4 +1,5 @@
 from __future__ import annotations
+from mockingbird.results import final_results
 
 import json
 from pathlib import Path
@@ -66,8 +67,8 @@ def test_context_plan_run_result_evidence_chain_and_failed_rerun(tmp_path, monke
         "uncollected": 0,
         "collection_error": 0,
     }
-    assert first_result["duration_s"] is not None
-    for test in first_result["tests"]:
+    assert json.loads((first_run / "run.json").read_text())["duration_s"] is not None
+    for test in final_results(first_result):
         assert test["artifacts"]
         assert all(isinstance(item, str) for item in test["artifacts"])
     for name in ("plan.json", "run.json", "executions.json", "result.json"):

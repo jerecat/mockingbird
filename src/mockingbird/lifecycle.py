@@ -494,13 +494,11 @@ def _collect_locked(defn, run_path):
     states = [journal["jobs"][job_id]["state"] for job_id in selected]
     complete = len(tests) == len(selected)
     result = {
-        "schema_version": 3,
+        "schema_version": 4,
         "run_id": run_record["run_id"],
         "plan": context.get("plan", context.get("name")),
         "generated_at": _now(),
         "started_at": run_record.get("started_at"),
-        "finished_at": run_record.get("finished_at"),
-        "duration_s": run_record.get("duration_s"),
         "status": ("PASS" if counts["FAIL"] == counts["ERROR"] == 0 else "FAIL") if complete else "PENDING",
         "collection_complete": complete,
         "summary": {
@@ -511,13 +509,7 @@ def _collect_locked(defn, run_path):
             "uncollected": states.count("UNCOLLECTED"),
             "collection_error": states.count("ERROR"),
         },
-        "tests": [test.to_dict() for test in tests],
-        "collection": journal["jobs"],
+        "jobs": journal["jobs"],
     }
     write_json(run_path / "result.json", result)
-    # Execution status is preserved independently of collection status.
-    run_record["collection_status"] = "COMPLETE" if complete else "PENDING"
-    run_record["collected_at"] = result["generated_at"]
-    run_record["result_status"] = result["status"]
-    write_json(run_path / "run.json", run_record)
     return result, run_path
