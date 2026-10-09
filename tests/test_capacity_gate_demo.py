@@ -57,6 +57,15 @@ def test_capacity_pause_finish_resume_and_collect(tmp_path):
         records = json.loads((tmp_path / 'work/capacity-demo-queue/queue.json').read_text())
         assert [r['job_id'] for r in records] == ['sim_a', 'sim_b']
         run_id = rd.name
+        # The ordinary collect path is also available while dispatch waits.
+        before = (rd / 'run.json').read_bytes()
+        mb('collect', expected=2)
+        partial = json.loads((rd / 'result.json').read_text())
+        assert partial['summary']['pending'] == 2
+        assert partial['summary']['uncollected'] == 1
+        assert partial['jobs']['sim_c']['attempts'] == 0
+        assert (rd / 'run.json').read_bytes() == before
+        assert process.poll() is None and queue('slots').stdout.strip() == '0'
         # Submission also enforces the cap if someone bypasses the capacity query.
         queue("submit", expected=1, MB_RUN_ID=run_id, MB_JOB_ID='bypass')
         # A typo must not complete another requested Job partially.

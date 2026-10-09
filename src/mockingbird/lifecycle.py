@@ -400,7 +400,11 @@ def _collect(defn, run_dir=None, *, refresh=False):
         context = saved_run_context(run_path)
         validate_definition_identity(defn, context)
         record = read_json(run_path / "run.json")
-        if record.get("status") not in {"EXECUTED", "COLLECTED", "ERROR", "INTERRUPTED"}:
+        # Per-Job checkpoints can be consumed before run finishes. Legacy
+        # aggregate-only runs retain their terminal-state prerequisite.
+        if (record.get("status") not in {"EXECUTED", "COLLECTED", "ERROR", "INTERRUPTED"}
+                and not (record.get("status") == "RUNNING"
+                         and record.get("checkpoint_storage") == "per-job")):
             raise RuntimeError(f"run is not collectable; status={record.get('status')!r}: {run_path}")
         if refresh:
             from .collection_refresh import refresh_journal
@@ -430,7 +434,9 @@ def _collect_locked(defn, run_path):
     context = saved_run_context(run_path)
     validate_definition_identity(defn, context)
     run_record = read_json(run_path / "run.json")
-    if run_record.get("status") not in {"EXECUTED", "COLLECTED", "ERROR", "INTERRUPTED"}:
+    if (run_record.get("status") not in {"EXECUTED", "COLLECTED", "ERROR", "INTERRUPTED"}
+            and not (run_record.get("status") == "RUNNING"
+                     and run_record.get("checkpoint_storage") == "per-job")):
         raise RuntimeError(f"run is not collectable; status={run_record.get('status')!r}: {run_path}")
     if run_record.get("schema_version") not in {2, 3}:
         raise RuntimeError("run schema is obsolete; use the previous version to collect this run")

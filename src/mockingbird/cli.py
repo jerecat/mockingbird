@@ -105,7 +105,7 @@ def build_parser() -> argparse.ArgumentParser:
         "doctor": "check configuration and plugin connections",
         "prepare": "prepare sources and save the workspace context",
         "setup": "set up the prepared execution environment",
-        "collect": "collect unresolved results from an existing run",
+        "collect": "collect saved executions, including during an active run",
         "status": "show saved observations for the latest-started run, or a selected run",
         "all": "prepare, setup, plan, run, then collect",
     }
@@ -248,7 +248,7 @@ def _status(defn: dict, run_dir: str | None, as_json=False, details=False) -> No
     print("\nLast recorded states; process liveness is not checked.")
     print("Command completion does not imply external completion.")
     print(f"run: {data['run_dir']}")
-    if data['execution_status'] != "RUNNING" and data['final'] < data['recorded']:
+    if data['final'] < data['recorded']:
         _next("collect", defn['plan'], data['run_dir'])
     if data['recorded'] < data['total'] and data['execution_status'] != "RUNNING":
         print("Jobs without execution records cannot be collected; run starts a new run.")
@@ -332,7 +332,7 @@ def _setup_progress(index, total, job_id, state):
 
 def _execution_summary(executions, run_dir):
     print(f"Execution finished: {len(executions)} execution records (external completion not checked)")
-    print("Collection: not started")
+    print("Collection: use status to inspect saved results")
     print(f"run: {run_dir}", flush=True)
 
 
@@ -551,9 +551,11 @@ def _collection_summary(result, run_dir, definition):
         print(f"Inspect: {_command('status', definition, run_dir)} --details")
     if result['summary']['pending'] or result['summary']['collection_error']:
         print("Collect again after external work finishes or collector errors are resolved.")
-        _next("collect", definition, run_dir)
     if result['summary']['uncollected']:
-        print("Jobs without execution records cannot be collected; run starts a new run.")
+        print("Jobs without execution records remain uncollected. If run is still active, "
+              "collect again as records arrive. Otherwise, run starts a new run.")
+    if any(result['summary'][key] for key in ('pending', 'collection_error', 'uncollected')):
+        _next("collect", definition, run_dir)
 
 
 def main() -> None:

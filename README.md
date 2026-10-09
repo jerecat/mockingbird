@@ -257,7 +257,11 @@ verdicts. Collect never updates run.json. Result schema 4 stores each Job once i
 
 `mb run` shows command progress. Use `mb status <plan>` from another
 terminal to inspect the latest saved execution and collection states, even before
-the first collect. See [Execution and collection status](Documentation/Execution_Status.md).
+the first collect. You can also run `mb collect <plan>` while run is active: it
+collects saved execution records, leaving Jobs without records UNCOLLECTED. Repeat
+collect to pick up later records or unresolved external results; no extra option
+or background monitor is needed. Exit code 2 means collection is still incomplete.
+Use `--run <run-id>` to keep targeting the same run if another run starts. See [Execution and collection status](Documentation/Execution_Status.md).
 
 Step-by-step walkthrough:
 [Mock Simulation Integration Tutorial](Documentation/Tutorial_Mock_Simulation.md).

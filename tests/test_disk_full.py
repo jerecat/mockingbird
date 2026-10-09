@@ -80,9 +80,11 @@ def test_terminal_record_enospc_leaves_stale_running_state(tmp_path, monkeypatch
     assert len(list(rd.glob("jobs/*/execution.json"))) == 2
     assert io.read_json(rd / "run.json")["status"] == "RUNNING"
     monkeypatch.setattr(lifecycle, "write_json", io.write_json)
-    # Characterize the current recovery limit; this is not an ideal requirement.
-    with pytest.raises(RuntimeError, match="not collectable"):
-        lifecycle.collect(d, rd)
+    before = (rd / "run.json").read_bytes()
+    result, _ = lifecycle.collect(d, rd)
+    assert result["collection_complete"] and result["summary"]["pass"] == 2
+    # Collection recovers saved evidence, never repairs or finalizes execution.
+    assert (rd / "run.json").read_bytes() == before
 
 
 def test_result_enospc_retry_reuses_saved_collection_checkpoints(tmp_path, monkeypatch):

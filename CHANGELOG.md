@@ -13,6 +13,12 @@
 
 ## Unreleased
 
+- Permit ordinary collect during RUNNING runs with per-Job checkpoints. Pick up
+  saved executions without waiting for dispatch to finish, retain final outcomes,
+  and leave not-yet-recorded Jobs UNCOLLECTED until a later sweep.
+- Keep execution/collection ownership, formats, exit codes and single-collector
+  locking unchanged; clarify live-run CLI guidance and the capacity-gate tutorial.
+
 - Resolve named plans through a single-user registry, independently of caller
   cwd; retain original project storage and execution cwd.
 - Register existing prepared plans through explicit confirmation; report unknown

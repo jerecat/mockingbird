@@ -23,8 +23,9 @@ message appears when capacity permits dispatch. A timeout or launch/executor
 error is identified when available in execution evidence. These are execution
 facts, not collector judgements.
 
-On normal return, the CLI reports that execution records were saved and collection
-has not started. In `all`, the collection phase then follows immediately.
+On normal return, the CLI reports that execution records were saved and directs
+you to status for saved collection results. Another terminal may already have
+collected some Jobs. In `all`, a collection sweep then follows immediately.
 A returning submit command does not mean its external work has finished.
 
 ## Inspect from another terminal
@@ -55,6 +56,27 @@ output is now human-readable rather than the old raw `result.json` output.
 Consumers requiring final result data should continue reading the run's
 `result.json`; see [Record formats](Record_Formats.md) for schema 4. The collector
 contract and status snapshot format are unchanged.
+
+## Collect while run is active
+
+From another terminal, run the ordinary commands:
+
+```sh
+mb collect sample-collector
+mb status sample-collector
+```
+
+No new mode is needed. Saved executions are collected; Jobs without execution
+records stay UNCOLLECTED. External results that are not ready stay PENDING.
+Repeat collect as more records/results become available. Exit code 2 means the
+selected set is still incomplete, including when no execution has been saved yet.
+Use `--run <run-id>` on each call when you want to stay with a specific run.
+
+Execution can remain RUNNING while some or all results are final. Collect never
+updates run.json, stops dispatch, or resumes execution. Records arriving after
+inspection can wait until the next sweep. Two collectors on the same run remain
+mutually exclusive. This applies to per-Job checkpoint runs, not old aggregate-only
+runs. See [Execution contract](Execution_Contract.md#repeated-collect-cycles-on-one-run).
 
 ## External state uses the existing collector contract
 

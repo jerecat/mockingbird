@@ -18,13 +18,13 @@ or power-loss durability. No runtime behavior is changed by this review.
 | A failed JSON update preserves the prior complete snapshot | ENOSPC at fsync and replace | Prior bytes unchanged; temporary file removed | Verified, two cases |
 | Failure to persist a returned execution stops subsequent dispatch | ENOSPC at execution.json | Only Job a executes; run records ERROR if its own storage is writable | Verified |
 | Missing execution evidence cannot be fabricated during recovery | Restore storage after checkpoint failure | collect reports two uncollected Jobs; no complete result | Verified limitation |
-| Completed Job checkpoints suffice if the terminal run record cannot be saved | ENOSPC at final run.json | Two checkpoints survive, but run remains RUNNING and collect rejects it after storage is restored | Known recovery gap; characterization only |
+| Completed Job checkpoints suffice if the terminal run record cannot be saved | ENOSPC at final run.json | Two checkpoints survive; collect recovers them after storage is restored and leaves run.json unchanged | Verified by the collect-during-run update |
 | Retrying a failed result publication does not rerun final collectors | ENOSPC at result.json, then restore storage | Saved per-Job collection checkpoints reused; two collector calls total; final result PASS | Verified |
 
-The stale RUNNING case is **not** a desirable recovery requirement. Its regression
-test characterizes the current limit and should change when an explicit recovery
-policy is implemented. Automatically treating RUNNING as finished is unsafe:
-the same status can also describe a live run.
+The collect-during-run update removes the stale RUNNING collection restriction
+for per-Job checkpoint runs. Collection uses the same saved evidence whether
+execution is live or no longer running, and never treats RUNNING as finished.
+See [verification evidence](collect-during-run-verification.md).
 
 ## Operational consequences
 
@@ -32,10 +32,10 @@ Free space before retrying and inspect execution evidence. A Job command may hav
 performed side effects even when its execution checkpoint is missing; another run
 must not be assumed to be a safe resume. Run starts a new run.
 
-A failure while publishing the terminal run record can leave the run uncollectable
-even after storage is restored. There is no verified automatic repair path in
-this review. Preserve the run evidence and decide whether project-side rerunning
-is safe. Do not blindly edit records or delete prior runs.
+After restoring storage, collect can recover saved per-Job evidence even when
+the terminal run record could not be published. The stale execution status is
+not repaired automatically; missing execution checkpoints cannot be reconstructed.
+Do not blindly edit records or delete prior runs.
 
 Child stdout/stderr are direct file descriptors, so write failures are observed
 by the child, not by an MB logging reader. Whether the child fails, suppresses
