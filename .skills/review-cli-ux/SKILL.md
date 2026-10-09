@@ -92,3 +92,14 @@ Before finishing, show representative terminal output and report tested journeys
 remaining limitations, and any machine-output compatibility changes. Use this
 repository skill directly; do not claim `.skills/` is automatically discovered
 by every Codex installation.
+
+## Review visual grouping
+
+Inspect complete terminal transcripts as well as individual messages. Separate
+phase/Job transitions, summaries, and next actions with one blank line. Keep a
+Job's completion and evidence together; indent supporting paths and every line
+of multiline details. Keep table rows compact and separate the table from prose.
+Check composed `all` and tutorial flows for missing or duplicated spacing, and
+verify stderr recovery and redirected output. Do not reformat child output,
+JSON documents, or saved logs to achieve human-output spacing. Avoid snapshots
+of every cosmetic line; exercise meaningful journeys and machine contracts.
