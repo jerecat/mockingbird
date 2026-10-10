@@ -126,6 +126,15 @@ def build_parser() -> argparse.ArgumentParser:
     _add_selection_args(run)
     run.add_argument("--interactive", action="store_true", help="show checklist and ask before run")
 
+    report = sub.add_parser("report", help="generate a standalone HTML report from saved runs")
+    report.add_argument("definition", metavar="PLAN")
+    report.add_argument("--run", dest="report_runs", action="append", default=[], help="include exact run ID; repeatable")
+    report.add_argument("--exclude-run", action="append", default=[], help="exclude exact run ID; repeatable")
+    report.add_argument("--last", type=int, help="latest N matching runs after exclusions")
+    report.add_argument("--since", help="inclusive start date YYYY-MM-DD, local timezone")
+    report.add_argument("--until", help="inclusive end date YYYY-MM-DD, local timezone")
+    report.add_argument("--output", help="HTML path outside runs; default: plan workspace/report.html")
+
     save = sub.add_parser("save", help="save a run's selected Jobs as a new plan YAML")
     save.add_argument("definition", metavar="PLAN")
     save.add_argument("--as", dest="new_name", required=True, metavar="NEW_PLAN")
@@ -401,7 +410,7 @@ def _dispatch(args, parser) -> None:
         from .tutorial import run_tutorial
         run_tutorial(args.directory, args.yes, args.advanced)
         return
-    named = args.command in {"setup", "plan", "run", "dry-run", "collect", "status", "save"}
+    named = args.command in {"setup", "plan", "run", "dry-run", "collect", "status", "save", "report"}
     if named:
         # Explicit run paths can refer to another operator's or legacy evidence;
         # inspecting them must neither require nor change our name registration.
@@ -421,6 +430,15 @@ def _dispatch(args, parser) -> None:
         if Path(run_id).name != run_id or run_id in {".", ".."} or "\\" in run_id:
             raise ValueError("--run must be a run ID, not a path; use --run-dir for a path")
         args.run_dir = str(run_root_path(defn) / run_id)
+
+    if args.command == "report":
+        from .report import generate_report
+        path, count, jobs = generate_report(defn, args.output, runs=args.report_runs,
+            exclude=args.exclude_run, last=args.last, since=args.since, until=args.until)
+        print(f"Report: {count} runs, {jobs} distinct Jobs")
+        print(f"HTML: {path}")
+        print("Open this file in a browser. Saved execution and collection records are unchanged.")
+        return
 
     if args.command == "save":
         from .save import save_plan

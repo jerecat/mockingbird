@@ -22,3 +22,6 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "-ra"
 
+
+[tool.setuptools.package-data]
+mockingbird = ["report.html"]
