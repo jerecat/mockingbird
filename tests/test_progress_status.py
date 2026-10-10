@@ -139,5 +139,5 @@ def test_display_separates_final_error_from_collection_error(tmp_path, monkeypat
     _status(defn, str(rd))
     output = capsys.readouterr().out
     rows = [line.split() for line in output.splitlines() if line.startswith(("a ", "b "))]
-    assert rows == [["a", "RECORDED", "COMPLETE", "ERROR"],
-                    ["b", "RECORDED", "COLLECTION_ERROR", "-"]]
+    assert rows == [["a", "COMPLETE", "COMPLETE", "ERROR"],
+                    ["b", "COMPLETE", "COLLECTION_ERROR", "-"]]

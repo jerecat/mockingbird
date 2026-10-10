@@ -172,3 +172,25 @@ summary, and the next action can be located without reading every line. Also
 inspect redirected output, stderr recovery, and JSON parsing. More blank lines
 are not inherently better; preserve compact comparison rows and keep related
 information adjacent.
+
+## Collection summary
+
+Human `collect` output separates collection progress from the overall verdict:
+
+```text
+Collection: 1/3 complete
+  PASS 1  FAIL 0  ERROR 0  SKIP 0
+  pending 2  collection error 0  uncollected 0
+```
+
+The denominator is the number of Jobs selected for this run. Complete means a
+Job has a final PASS, FAIL, ERROR, or SKIP verdict; it does not mean it passed.
+Pending, collection errors, and uncollected Jobs do not count as complete.
+`Result: PASS` or `Result: FAIL` appears only when all selected Jobs have final
+verdicts. `status` uses the same `complete` wording for its collection count.
+JSON records retain the existing PENDING status and exit codes are unchanged.
+
+In the human `status` table, execution `COMPLETE` means an execution record was
+saved after the command attempt. It does not imply command success or external
+simulation completion. JSON continues to use `RECORDED`; other execution states
+are displayed unchanged. Collection `COMPLETE` means a final verdict is available.

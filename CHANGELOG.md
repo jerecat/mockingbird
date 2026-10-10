@@ -13,6 +13,11 @@
 
 ## Unreleased
 
+- Show collection progress as `Collection: N/M complete` and display the overall
+  result only after all selected Jobs have final verdicts. Use `complete` in
+  status as well, and display recorded Job executions as `COMPLETE`. JSON
+  records and exit codes are unchanged.
+
 - Group human CLI output with blank lines at phase/Job boundaries, summaries,
   and next actions; indent supporting evidence and multiline errors. Apply the
   same visual grouping to status/history, doctor, recovery, and tutorials.

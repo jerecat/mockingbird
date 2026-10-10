@@ -49,9 +49,10 @@ def test_first_run_recovery_and_human_outputs(session):
     assert status.returncode == 0
     rows = [line for line in status.stdout.splitlines() if line.startswith(("JOB ", "short ", "a_longer_job "))]
     assert len(rows) == 3
-    assert rows[0].index("EXECUTION") == rows[1].index("RECORDED") == rows[2].index("RECORDED")
+    assert rows[0].index("EXECUTION") == rows[1].index("COMPLETE") == rows[2].index("COMPLETE")
     collected = cli("collect", "test")
-    assert collected.returncode == 0 and "Result: PASS (2 jobs)" in collected.stdout
+    assert collected.returncode == 0 and "Result: PASS" in collected.stdout
+    assert "Collection: 2/2 complete" in collected.stdout
 
 
 def test_json_is_opt_in_and_parseable(session):
@@ -64,6 +65,8 @@ def test_json_is_opt_in_and_parseable(session):
     for cycle in ("status", "collect"):
         output = cli(cycle, "test", "--json")
         assert output.returncode == 0 and isinstance(json.loads(output.stdout), dict)
+        if cycle == "status":
+            assert all(job["execution"] == "RECORDED" for job in json.loads(output.stdout)["jobs"])
 
 
 def test_missing_plan_does_not_repeat_successful_setup(session):
@@ -145,3 +148,21 @@ def test_unexpected_error_has_debug_escape_hatch(monkeypatch, capsys):
     output = capsys.readouterr()
     assert "unexpected field" in output.err and "--debug" in output.err
     assert "Traceback" not in output.err
+
+
+@pytest.mark.parametrize("counts,status,complete", [
+    ((1, 0, 0, 0, 2, 0, 0), "PENDING", False),
+    ((1, 0, 0, 0, 0, 1, 1), "PENDING", False),
+    ((2, 1, 0, 0, 0, 0, 0), "FAIL", True),
+    ((0, 0, 1, 2, 0, 0, 0), "FAIL", True),
+    ((3, 0, 0, 0, 0, 0, 0), "PASS", True),
+])
+def test_collection_summary_distinguishes_progress_from_verdict(counts, status, complete):
+    from mockingbird.cli import _summary
+    keys = ("pass", "fail", "error", "skip", "pending", "collection_error", "uncollected")
+    summary = dict(zip(keys, counts), total=3)
+    output = _summary({"summary": summary, "status": status, "collection_complete": complete})
+    assert f"Collection: {3 if complete else 1}/3 complete" in output
+    assert "Result:" not in output if not complete else f"Result: {status}" in output
+    assert "PASS " + str(counts[0]) in output
+    assert "collection error " + str(counts[5]) in output

@@ -127,7 +127,8 @@ Confirmed: worktree-demo (1 jobs)
   - test_basic
 Next: mb run worktree-demo
 
-Result: PASS (1 jobs)
+Collection: 1/1 complete
+Result: PASS
   PASS 1  FAIL 0  ERROR 0  SKIP 0
   pending 0  uncollected 0  collection error 0
 

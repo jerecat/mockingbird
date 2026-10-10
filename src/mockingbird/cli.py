@@ -90,7 +90,11 @@ def _summary(result: dict) -> str:
     counts = result["summary"]
     verdicts = "  ".join(f"{key.upper()} {counts[key]}" for key in ("pass", "fail", "error", "skip"))
     unresolved = "  ".join(f"{key.replace('_', ' ')} {counts[key]}" for key in ("pending", "collection_error", "uncollected"))
-    return f"Result: {result['status']} ({counts['total']} jobs)\n  {verdicts}\n  {unresolved}"
+    complete = sum(counts[key] for key in ("pass", "fail", "error", "skip"))
+    summary = f"Collection: {complete}/{counts['total']} complete\n  {verdicts}\n  {unresolved}"
+    if result["collection_complete"]:
+        summary += f"\n\nResult: {result['status']}"
+    return summary
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -234,13 +238,14 @@ def _status(defn: dict, run_dir: str | None, as_json=False, details=False) -> No
     print(f"Updated:    {_time(data['last_execution_update'])}")
     sweep = data['collection_sweep']
     phase = sweep.get('state', 'NOT_STARTED' if not any(j['observed_at'] for j in data['jobs']) else 'UNKNOWN')
-    print(f"\nCollection: {data['final']}/{data['total']} final; sweep {phase}")
+    print(f"\nCollection: {data['final']}/{data['total']} complete; sweep {phase}")
     counts = data['collection_counts']
     print(f"            pending {counts['PENDING']}  collection errors {counts['ERROR']}  uncollected {counts['UNCOLLECTED']}")
     if sweep:
         print(f"Updated:    {_time(sweep['updated_at'])}")
     rows = [("JOB", "EXECUTION", "COLLECTION", "RESULT")]
-    rows.extend((job['id'], job['execution'],
+    rows.extend((job['id'],
+                 "COMPLETE" if job['execution'] == "RECORDED" else job['execution'],
                  "COLLECTION_ERROR" if job['collection'] == "ERROR" else job['collection'],
                  job['verdict'] or "-") for job in data['jobs'])
     widths = [max(len(row[i]) for row in rows) for i in range(4)]

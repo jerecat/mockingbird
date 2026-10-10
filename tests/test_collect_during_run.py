@@ -97,7 +97,8 @@ print(json.dumps({'status': status}))
         evidence = {p: p.read_bytes() for p in rd.glob('jobs/*/execution.json')}
         assert len(evidence) == 3
         partial_output = cli('collect', 'live', '--run', rd.name, expected=2).stdout
-        assert 'Result: PENDING (4 jobs)' in partial_output
+        assert 'Collection: 1/4 complete' in partial_output
+        assert 'Result:' not in partial_output
         assert 'collect again as records arrive' in partial_output
         assert partial_output.count('Next: mb collect') == 1
         partial = read_json(rd / 'result.json')
